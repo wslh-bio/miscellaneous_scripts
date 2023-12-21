@@ -4,7 +4,7 @@ import sys
 import argparse
 import os
 
-from scripts.fastq_dir_to_samplesheet import fastq_dir_to_samplesheet
+from fastq_dir_to_samplesheet import fastq_dir_to_samplesheet
 
 
 # Parse Arguments
