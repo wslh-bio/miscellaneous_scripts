@@ -41,7 +41,7 @@ output_path = os.path.abspath(args.output_dir)
 num_reads = args.num_reads
 
 # run seqtk
-print("Running seqtk...")
+print("Running seqtk sample...")
 for fastq in fastq_files:
     subsample_file = os.path.basename(fastq).replace(".fastq.gz","_subsample.fastq")
     subsample_file_path = os.path.join(output_path,subsample_file)
@@ -50,4 +50,4 @@ for fastq in fastq_files:
     outFile = open(subsample_file_path,"w")
     cmd = shlex.split(f"{seqtk_path}/seqtk sample -s100 {fastq} {num_reads}")
     sub.Popen(cmd, stdout=outFile).wait()
-print("seqtk complete!")
+print("seqtk sample complete!")
