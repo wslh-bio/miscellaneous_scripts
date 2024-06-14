@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 
 # This script uses seqtk to downsample a fastq file to a specific number of num_reads
-# Usage: python3 run_seqtk.py [path to directory containing fastqs in gzip format] \\
+# Usage: python3 subsample_with_seqtk.py [path to directory containing fastqs in gzip format] \\
 # [path to seqtk] [output path] [target number of reads]
 
 import sys
