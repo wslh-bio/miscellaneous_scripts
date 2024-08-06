@@ -18,9 +18,9 @@ def parse_args(args=None):
     Epilog = 'Example usage: python3 viralrecon_pull_consensus.py <WSLH_REPORT_URI> <FASTA_S3_URI>'
     parser = argparse.ArgumentParser(description=Description)
     parser.add_argument('wslh_report',
-        help='Report to be get consensus IDs from.')
+        help='URI report to be get consensus IDs from.')
     parser.add_argument('uri_to_sequences',
-        help='Path to directory holding consensus sequences.')
+        help='URI for directory holding consensus sequences.')
     return parser.parse_args(args)
 
 def make_folder_path():
