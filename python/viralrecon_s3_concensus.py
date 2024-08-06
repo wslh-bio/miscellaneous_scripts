@@ -11,7 +11,7 @@ import pandas as pd
 from datetime import datetime
 from io import StringIO
 
-# logging.basicConfig(level = logging.DEBUG, format = '%(levelname)s : %(message)s', force = True)
+logging.basicConfig(level = logging.INFO, format = '%(levelname)s : %(message)s', force = True)
 
 def parse_args(args=None):
     Description=('Pull consensus sequences from viralrecon WSLH report.')
@@ -90,6 +90,5 @@ def main(args=None):
     passing_ids = process_report(args.wslh_report)
     pull_consensus_seqs(args.uri_to_sequences, passing_ids, folder_path)
 
-    
 if __name__ == "__main__":
     sys.exit(main())
