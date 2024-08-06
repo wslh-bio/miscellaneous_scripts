@@ -18,7 +18,7 @@ def parse_args(args=None):
     Epilog = 'Example usage: python3 viralrecon_pull_consensus.py <WSLH_REPORT_URI> <FASTA_S3_URI>'
     parser = argparse.ArgumentParser(description=Description)
     parser.add_argument('wslh_report',
-        help='URI report to be get consensus IDs from.')
+        help='URI for report to get consensus IDs from.')
     parser.add_argument('uri_to_sequences',
         help='URI for directory holding consensus sequences.')
     return parser.parse_args(args)
@@ -58,6 +58,7 @@ def process_report(s3_report_uri):
     return passing_sample_names
 
 def pull_consensus_seqs(uri_to_seqs, ids, output_path):
+
     s3 = boto3.client('s3')
 
     if not os.path.exists(output_path):
