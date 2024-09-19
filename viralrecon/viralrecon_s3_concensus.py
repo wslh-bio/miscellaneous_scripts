@@ -90,6 +90,5 @@ def main(args=None):
     passing_ids = process_report(args.wslh_report)
     pull_consensus_seqs(args.uri_to_sequences, passing_ids, folder_path)
 
-    
 if __name__ == "__main__":
     sys.exit(main())
