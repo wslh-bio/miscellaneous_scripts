@@ -23,7 +23,7 @@ def parse_log(log):
     lengthDict = {'Sample':[],'Sequence':[],'Sequence Length':[]}
     covDict = {'Sequence':[],'Cluster Coverage (%)':[]}
 
-    with open('parsnpAligner.log','r') as logFile:
+    with open(log,'r') as logFile:
         for ind, line in enumerate(logFile,1):
             # search for sequence lines
             if re.search('Sequence \d+ : ',line):
