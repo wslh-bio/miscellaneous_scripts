@@ -10,13 +10,14 @@ import argparse
 # https://stackoverflow.com/questions/30286603/python-extract-text-4-lines-after-match
 
 def parse_args(args=None):
-  Description='Covert parsnpAligner.log to tsv'
+    Description='Covert parsnpAligner.log to tsv'
 
-  parser = argparse.ArgumentParser(description=Description)
-  parser.add_argument('log',
-                      help='Parsnp\'s parsnpAligner.log file.')
-
-  return parser.parse_args(args)
+    parser = argparse.ArgumentParser(description=Description)
+    parser.add_argument('log',
+                    help='Parsnp\'s parsnpAligner.log file.')
+    parser.add_argument('add_reference',
+                    help='Keep reference in output')
+    return parser.parse_args(args)
 
 def parse_log(log):
     # create empty dictionaries
@@ -60,7 +61,7 @@ def parse_log(log):
                 totalCoverage = float(line.strip().split(":")[1].lstrip().replace('%',''))
     return lengthDict, covDict, totalCoverage
 
-def createDF(lengthDict, covDict, totalCoverage):
+def createDF(lengthDict, covDict, totalCoverage, addRef):
     # convert length dictionary to data frame
     lengthDF = pd.DataFrame.from_dict(lengthDict, orient='columns')
     # change sequence length from str to int
@@ -85,8 +86,10 @@ def createDF(lengthDict, covDict, totalCoverage):
     merged_df = merged_df.assign(TotalCoverage=totalCoverage)
     merged_df.rename(columns={'TotalCoverage':'Total Coverage (%)'}, inplace = True)
 
-    # drop reference row
-    merged_df.drop(merged_df[merged_df['Sample'].str.endswith('.ref')].index, inplace = True)
+    # if reference is removed (default) drop reference from df 
+    if addRef == FALSE:
+        # drop reference row
+        merged_df.drop(merged_df[merged_df['Sample'].str.endswith('.ref')].index, inplace = True)
 
     # write to file
     merged_df.to_csv(f'aligner_log.tsv', sep='\t', index=False, header=True, na_rep='NaN')
@@ -94,7 +97,7 @@ def createDF(lengthDict, covDict, totalCoverage):
 def main(args=None):
     args = parse_args(args)
     lengthDict, covDict, totalCoverage = parse_log(args.log)
-    createDF(lengthDict, covDict, totalCoverage)
+    createDF(lengthDict, covDict, totalCoverage, args.add_reference)
 
 if __name__ == "__main__":
     sys.exit(main())
