@@ -43,7 +43,7 @@ def check_file_bytes(file_path):
         file_size_dict[filename] = size
 
     for k,v in file_size_dict.items():
-        if int(v) < 20:
+        if int(v) <= 20:
             files_to_check.append(k)
 
     return files_to_check
