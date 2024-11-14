@@ -1,13 +1,19 @@
 #!/usr/bin/env python3
 
 import argparse
-import os
-import sys
 import logging
-import pandas as pd
+import sys
+import boto3
 import gzip
 
+import pandas as pd
+
+from io import BytesIO
+
 logging.basicConfig(level = logging.INFO, format = '%(levelname)s : %(message)s', force = True)
+
+logging.debug("Initializing s3")
+s3 = boto3.client('s3')
 
 def parse_args(args=None):
     description= 'Checks to ensure the file has content. Removes the file from the samplesheet if there is no data.'
@@ -17,55 +23,36 @@ def parse_args(args=None):
         help='Samplesheet to check.')
     return parser.parse_args(args)
 
-def get_file_path(samplesheet):
+def is_s3_gzipped_file_empty(uri):
 
-    logging.debug("Setting up dataframe to extract path of files.")
-    df = pd.read_csv(samplesheet)
+    logging.debug("Get bucket and prefix information")
+    bucket_name, key = uri.replace("s3://", "").split("/", 1)
 
-    column_name = df.columns[1]
-    file_path = df[column_name].iloc[1]
-    path_only = os.path.dirname(file_path)
+    logging.debug("Getting s3 object")
+    response = s3.get_object(Bucket=bucket_name, Key=key)
 
-    logging.debug("Setting full path up")
-    path_only = path_only + "/"
+    with gzip.GzipFile(fileobj=BytesIO(response['Body'].read())) as infile:
 
-    return path_only
+        logging.debug("Checking if the file has data")
+        return infile.read(1) == b''
 
-def check_file_bytes(file_path):
+def look_at_samplesheet(samplesheet):
 
-    with gzip.open(file_path, 'rb') as infile:
+    ss_df = pd.read_csv(samplesheet, header=0)
 
-        logging.debug(f"Try to read one byte from {infile}")
-        try:
+    filtered_samplesheet = ss_df[
+    ss_df['fastq_1'].apply(lambda uri: not is_s3_gzipped_file_empty(uri)) &
+    ss_df.apply(lambda row: (row['single_end'] or pd.isna(row['fastq_2']) or not is_s3_gzipped_file_empty(row['fastq_2'])), axis=1)
+    ]
 
-            logging.debug(f"{infile} is empty")
-            return infile.read(1) == b''
+    final_file = filtered_samplesheet.to_csv('filtered_samplesheet.csv', index=False)
 
-        except OSError:
-            logging.info(f"Error reading file: {file_path}")
-            return True
-
-
-def remove_from_samplesheet(list_files, samplesheet):
-
-    outfile = "final_" + os.path.basename(samplesheet)
-    removed = "removed_samples_" + os.path.basename(samplesheet)
-
-    with open(samplesheet, "r") as file, open(outfile, "w") as out, open(removed, "w") as rm:
-        for line in file:
-            if any(file in line for file in list_files):
-                rm.write(line)
-            else:
-                out.write(line)
-
-    return out, rm
+    return final_file
 
 def main(args=None):
     args = parse_args(args)
 
-    file_path = get_file_path(args.samplesheet)
-    files_to_check_bytes = check_file_bytes(file_path)
-    remove_from_samplesheet(files_to_check_bytes, args.samplesheet)
+    look_at_samplesheet(args.samplesheet)
 
 if __name__ == "__main__":
     sys.exit(main())
