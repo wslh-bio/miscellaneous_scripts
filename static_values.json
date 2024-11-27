@@ -44,10 +44,10 @@
         "covv_orig_lab_addr": "2601 Agriculture Dr Madison WI 53718",
         "covv_subm_lab": "Wisconsin State Laboratory of Hygiene Communicable Disease Division",
         "covv_subm_lab_addr": "2601 Agriculture Dr Madison WI 53718",
-        "covv_authors": "Abigail C. Shockey, Eva Gunawan, Alicia J. Mooney, Erika M. Hanson, Tonya Danz, Richard Griesser, Kelsey R. Florek"
+        "covv_authors": "Christopher R. Jossart, Eva Gunawan, Abigail C. Shockey, Alicia J. Mooney, Erika M. Hanson, Richard Griesser, Kelsey R. Florek"
     },
     "column_mappings" : {
         "covv_collection_date": "DOC",
-        "covv_add_location": "Unknown"
+        "covv_location": "Pt County"
     }
 }
