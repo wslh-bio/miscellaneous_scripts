@@ -13,12 +13,14 @@ logging.basicConfig(level = logging.DEBUG, format = "%(levelname)s : %(message)s
 
 def parse_args(args=None):
     description= ""
-    epilog = "Example usage: python3 gisaid_upload_script.py <> <>"
+    epilog = "Example usage: python3 gisaid_upload_script.py <path to reports> <json file> <masterlog>"
     parser = argparse.ArgumentParser(description=description, epilog=epilog)
     parser.add_argument("path_to_output_csvs",
-        help="")
+        help="Path to compiled viral recon reports.")
     parser.add_argument("json_file",
         help="Path to json file with static values.")
+    parser.add_argument("masterlog",
+        help="Path to virus masterlog.")
     return parser.parse_args(args)
 
 def load_json(json_file):
@@ -29,60 +31,60 @@ def load_json(json_file):
 
     return json_data
 
-# 2. Create a function to map CSV columns to required columns
-def create_column_mapping(csv_columns, required_columns, json_data):
-    logging.debug("Creating a fuction to map CSV columns to all of the required columns.")
-    column_mapping = {}
+def process_csv_files(csv_dir, json_data, masterlog):
 
-    for required_column in required_columns:
-        # If there's a mapping for this required column in the JSON
-        if required_column in json_data.get('column_mappings', {}):
-            # Map the CSV column to the required column
-            csv_column_name = json_data['column_mappings'].get(required_column, None)
-            if csv_column_name and csv_column_name in csv_columns:
-                column_mapping[csv_column_name] = required_column
-
-    return column_mapping
-
-# 3. Process the CSV files and filter data based on the "qc" column
-def process_csv_files(csv_dir, json_data):
-    # Create a list to store all the processed data
     all_data = []
 
-    # Get the required columns from the JSON
     required_columns = json_data.get('required_columns', [])
+    logging.debug(f"{required_columns}")
 
-    # Iterate over all CSV files in the directory
+    df_masterlog = pd.read_csv(masterlog, on_bad_lines='skip', sep="\t")
+
     for filename in os.listdir(csv_dir):
-        if filename.endswith('.csv'):
-            csv_path = os.path.join(csv_dir, filename)
-            # Load the CSV file into a pandas DataFrame
-            df = pd.read_csv(csv_path)
 
-            # 4. Filter rows where the "qc" column has value "pass"
-            passing_samples = df[df['WSLH_qc'] == 'pass']
+        logging.debug(f"Processing {filename}")
+        csv_path = os.path.join(csv_dir, filename)
+        df_csv = pd.read_csv(csv_path)
 
-            # 5. Create a mapping of CSV columns to required columns
-            column_mapping = create_column_mapping(df.columns, required_columns, json_data)
+        logging.debug("Filtering to include only passing samples.")
+        passing_samples = df_csv[df_csv['WSLH_qc'] == 'pass']['sample_id']
+        logging.debug(f"From file {filename}\n{passing_samples}")
 
-            # 6. Rename the columns of the DataFrame based on the mapping
-            passing_samples_renamed = passing_samples.rename(columns=column_mapping)
+        column_mappings = json_data.get('column_mappings', {})
 
-            # Extract only the required columns based on the mapping
-            passing_samples_filtered = passing_samples_renamed[required_columns]
+    for required_name, report_name in column_mappings.items():
+        logging.debug(f"The key is {required_name}. The value is {report_name}.")
 
-            # Add static data from the JSON (assuming it is a dict of values)
-            for column in json_data.get('static_columns', {}):
-                passing_samples_filtered[column] = json_data['static_columns'][column]
+        if report_name in df_masterlog.columns:
+            logging.debug(f"Found column '{report_name}' in df_masterlog.")
 
-            # Append the processed data
-            all_data.append(passing_samples_filtered)
+            for sample in passing_samples:
+                output = df_masterlog.loc[df_masterlog['WSLH ID'] == sample, report_name]
 
-    # Concatenate all the processed data into one DataFrame
-    final_data = pd.concat(all_data, ignore_index=True)
-    return final_data
+                if not output.empty:
+                    doc = df_masterlog.loc[df_masterlog['WSLH ID'] == sample, 'DOC']
+                    county = df_masterlog.loc[df_masterlog['WSLH ID'] == sample, 'Pt County']
+
+                all_data.append({
+                    'Sample ID': sample,
+                    'DOC': doc.iloc[0] if not doc.empty else None,
+                    'County': county.iloc[0] if not county.empty else None
+                })
+
+    return all_data
+
+def joining_information(ml_data, json_data):
+
+    logging.info("Starting to merge data frames.")
+    ml = pd.DataFrame(ml_data)
+
+    static_columns = json_data.get('static_columns', [])
+
+    print(ml)
+    print(static_columns)
 
 def determine_output_name():
+
     upload_date = datetime.today().strftime('%Y-%m-%d')
     output_file_name = upload_date + "_EpiCoV_BulkUpload.csv"
 
@@ -90,21 +92,36 @@ def determine_output_name():
 
 # 7. Write the combined data to an output CSV file
 def write_output_file(output_file, final_data):
-    final_data.to_csv(output_file, index=False)
+
+    pass
+    # out.to_csv(output_file, sep='\t')
 
 def main(args=None):
     args = parse_args(args)
 
-    # Load the static data from the JSON
     json_data = load_json(args.json_file)
-
-    # Process the CSV files and extract the required data
-    final_data = process_csv_files(args.path_to_output_csvs, json_data)
-
+    masterlog_data = process_csv_files(args.path_to_output_csvs, json_data, args.masterlog)
+    final_data = joining_information(masterlog_data, json_data)
     output_file_name = determine_output_name()
-
-    # Write the final data to an output CSV file
     write_output_file(output_file_name, final_data)
 
 if __name__ == "__main__":
     sys.exit(main())
+
+
+    # def create_column_mapping(csv_columns, required_columns, json_data):
+#     logging.debug("Creating a function to map CSV columns to required columns.")
+#     column_mapping = {}
+
+#     # Get the 'column_mappings' dictionary from the JSON data
+#     column_mappings = json_data.get('column_mappings', {})
+
+#     # Iterate through the keys (required columns) in 'column_mappings'
+#     for required_column, csv_column_name in column_mappings.items():
+#         # Check if the csv_column_name exists in the CSV columns
+#         if csv_column_name in csv_columns:
+#             column_mapping[csv_column_name] = required_column
+#         else:
+#             logging.warning(f"CSV column for '{required_column}' not found: {csv_column_name}")
+
+#     return column_mapping
