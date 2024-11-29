@@ -79,6 +79,7 @@ def joining_information(ml_data, json_data):
     ml = pd.DataFrame(ml_data)
 
     static_columns = json_data.get('static_columns', [])
+    static_columns = pd.DataFrame(static_columns, index=[0])
 
     print(ml)
     print(static_columns)
@@ -87,8 +88,9 @@ def determine_output_name():
 
     upload_date = datetime.today().strftime('%Y-%m-%d')
     output_file_name = upload_date + "_EpiCoV_BulkUpload.csv"
+    fn_output_name = upload_date + "_upload.fasta"
 
-    return output_file_name
+    return output_file_name, fn_output_name
 
 # 7. Write the combined data to an output CSV file
 def write_output_file(output_file, final_data):
