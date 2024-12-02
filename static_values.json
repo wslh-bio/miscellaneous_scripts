@@ -33,8 +33,10 @@
     ],
     "static_columns": {
         "submitter" : "evagunawan",
+        "covv_virus_name" : "hCoV-19/USA/",
         "covv_type": "betacoronavirus",
         "covv_passage": "Original",
+        "covv_location": "North America / USA / Wisconsin",
         "covv_host": "Human",
         "covv_gender": "unknown",
         "covv_patient_age": "unknown",
