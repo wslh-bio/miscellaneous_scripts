@@ -8,6 +8,7 @@ import json
 import pandas as pd
 
 from datetime import datetime
+from Bio import SeqIO
 
 logging.basicConfig(level = logging.DEBUG, format = "%(levelname)s : %(message)s", force = True)
 
@@ -31,12 +32,17 @@ def load_json(json_file):
 
     return json_data
 
-def process_csv_files(csv_dir, json_data, masterlog):
+def determine_output_names():
+
+    upload_date = datetime.today().strftime('%Y-%m-%d')
+    output_file_name = upload_date + "_EpiCoV_BulkUpload.csv"
+    fn_output_name = upload_date + "_upload.fasta"
+
+    return output_file_name, fn_output_name
+
+def process_csv_files(csv_dir, json_data, masterlog, fasta_name):
 
     all_data = []
-
-    required_columns = json_data.get('required_columns', [])
-    logging.debug(f"{required_columns}")
 
     df_masterlog = pd.read_csv(masterlog, on_bad_lines='skip', sep="\t")
 
@@ -64,66 +70,83 @@ def process_csv_files(csv_dir, json_data, masterlog):
                 if not output.empty:
                     doc = df_masterlog.loc[df_masterlog['WSLH ID'] == sample, 'DOC']
                     county = df_masterlog.loc[df_masterlog['WSLH ID'] == sample, 'Pt County']
+                    id = df_masterlog.loc[df_masterlog['WSLH ID'] == sample, 'Sequencing ID']
 
                 all_data.append({
                     'Sample ID': sample,
                     'DOC': doc.iloc[0] if not doc.empty else None,
-                    'County': county.iloc[0] if not county.empty else None
+                    'County': county.iloc[0] if not county.empty else None,
+                    'Sequencing ID' : id.iloc[0] if not id.empty else None
                 })
+
+    for sample in all_data:
+        sample['fn'] = fasta_name
 
     return all_data
 
-def joining_information(ml_data, json_data):
+def joining_information(ml_data, json_data, name):
 
-    logging.info("Starting to merge data frames.")
+    date = datetime.today().strftime('%Y')
+
+    logging.debug("Starting to merge data frames.")
     ml = pd.DataFrame(ml_data)
 
+    logging.debug("Setting up json info")
     static_columns = json_data.get('static_columns', [])
     static_columns = pd.DataFrame(static_columns, index=[0])
 
-    print(ml)
-    print(static_columns)
+    column_order = json_data.get('required_columns', [])
 
-def determine_output_name():
+    logging.debug("Merging static columns and ml data")
+    merged = pd.DataFrame.merge(ml, static_columns, how='cross')
 
-    upload_date = datetime.today().strftime('%Y-%m-%d')
-    output_file_name = upload_date + "_EpiCoV_BulkUpload.csv"
-    fn_output_name = upload_date + "_upload.fasta"
+    logging.debug("Updating with proper formatting.")
+    merged['covv_location'] = merged['covv_location'] + merged['County']
+    merged['covv_virus_name'] = merged['covv_virus_name'] + ml['Sequencing ID'] + "/" + date
 
-    return output_file_name, fn_output_name
+    logging.debug("Dropping columns.")
+    merged.drop(columns=['County'])
+    merged.drop(columns=['Sequencing ID'])
+    merged.drop(columns=['Sample ID'])
 
-# 7. Write the combined data to an output CSV file
-def write_output_file(output_file, final_data):
+    merged.reindex(columns=column_order)
+
+    merged.to_csv(name, index=False)
+    sys.exit(0)
+
+    return merged
+
+def write_output_file(output_file, json, data):
+
+    required_columns = json.get('required_columns', [])
+
+    # Add missing columns as NaN
+    for header in required_columns:
+        if header not in data.columns:
+            logging.warning(f"Adding missing column: {header}")
+            data[header] = None  # Or use pd.NA for explicitly Pandas' NA value
+
+    # Reorder columns to match the required order
+    data = data[required_columns]
+
+    # Write the reordered DataFrame to the output file
+    data.to_csv(output_file, index=False)
+
+    # out.to_csv(output_file, sep='\t')
+
+def write_fasta_file(fasta_name):
 
     pass
-    # out.to_csv(output_file, sep='\t')
 
 def main(args=None):
     args = parse_args(args)
 
     json_data = load_json(args.json_file)
-    masterlog_data = process_csv_files(args.path_to_output_csvs, json_data, args.masterlog)
-    final_data = joining_information(masterlog_data, json_data)
-    output_file_name = determine_output_name()
-    write_output_file(output_file_name, final_data)
+    output_file_name, fasta_name = determine_output_names()
+    masterlog_data = process_csv_files(args.path_to_output_csvs, json_data, args.masterlog, fasta_name)
+    final_data = joining_information(masterlog_data, json_data, output_file_name)
+    write_output_file(output_file_name, json_data, final_data)
+    write_fasta_file(fasta_name)
 
 if __name__ == "__main__":
     sys.exit(main())
-
-
-    # def create_column_mapping(csv_columns, required_columns, json_data):
-#     logging.debug("Creating a function to map CSV columns to required columns.")
-#     column_mapping = {}
-
-#     # Get the 'column_mappings' dictionary from the JSON data
-#     column_mappings = json_data.get('column_mappings', {})
-
-#     # Iterate through the keys (required columns) in 'column_mappings'
-#     for required_column, csv_column_name in column_mappings.items():
-#         # Check if the csv_column_name exists in the CSV columns
-#         if csv_column_name in csv_columns:
-#             column_mapping[csv_column_name] = required_column
-#         else:
-#             logging.warning(f"CSV column for '{required_column}' not found: {csv_column_name}")
-
-#     return column_mapping
