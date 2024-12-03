@@ -106,6 +106,9 @@ def joining_information(ml_data, json_data, name):
     merged['covv_location'] = merged['covv_location'].str.lstrip("/")
     merged['covv_virus_name'] = merged['covv_virus_name'] + ml['Sequencing ID'] + "/" + date
     merged = merged.rename(columns={"DOC":"covv_collection_date"})
+    merged['covv_collection_date'] = pd.to_datetime(merged['covv_collection_date'], format='%m/%d/%Y').dt.strftime('%Y-%m-%d')
+
+
 
     logging.debug("Dropping columns.")
     merged = merged.drop(columns=['County'])
