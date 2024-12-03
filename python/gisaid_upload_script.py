@@ -101,11 +101,11 @@ def joining_information(ml_data, json_data, name):
     merged = pd.DataFrame.merge(ml, static_columns, how='cross')
 
     logging.debug("Updating with proper formatting.")
-    merged['covv_location'] = merged['covv_location'].fillna("")
     merged['covv_location'] = merged['covv_location'] + " / " + merged['County'].str.capitalize()
+    merged['covv_location'] = merged["covv_location"].fillna("North America / USA / Wisconsin")
     merged['covv_location'] = merged['covv_location'].str.lstrip("/")
     merged['covv_virus_name'] = merged['covv_virus_name'] + ml['Sequencing ID'] + "/" + date
-    # merged['covv_collection_date'] = merged['doc']
+    merged = merged.rename(columns={"DOC":"covv_collection_date"})
 
     logging.debug("Dropping columns.")
     merged = merged.drop(columns=['County'])
@@ -114,7 +114,7 @@ def joining_information(ml_data, json_data, name):
 
     merged.reindex(columns=column_order)
 
-    merged.to_csv(name, index=False)
+    # merged.to_csv(name, index=False)
 
     return merged
 
