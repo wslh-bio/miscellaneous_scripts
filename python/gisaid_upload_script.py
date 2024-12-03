@@ -34,6 +34,7 @@ def load_json(json_file):
 
 def determine_output_names():
 
+    logging.debug("Creating file names based on date.")
     upload_date = datetime.today().strftime('%Y-%m-%d')
     output_file_name = upload_date + "_EpiCoV_BulkUpload.csv"
     fn_output_name = upload_date + "_upload.fasta"
@@ -42,10 +43,13 @@ def determine_output_names():
 
 def process_csv_files(csv_dir, json_data, masterlog, fasta_name):
 
+    logging.debug("Setting up blank list to store information from ml")
     all_data = []
 
     df_masterlog = pd.read_csv(masterlog, on_bad_lines='skip', sep="\t")
 
+
+    logging.debug("Going through each file in the directory.")
     for filename in os.listdir(csv_dir):
 
         logging.debug(f"Processing {filename}")
@@ -56,6 +60,7 @@ def process_csv_files(csv_dir, json_data, masterlog, fasta_name):
         passing_samples = df_csv[df_csv['WSLH_qc'] == 'pass']['sample_id']
         logging.debug(f"From file {filename}\n{passing_samples}")
 
+        logging.debug("Reading in information for mapping columns to each other from masterlog and output file columns.")
         column_mappings = json_data.get('column_mappings', {})
 
     for required_name, report_name in column_mappings.items():
@@ -67,25 +72,28 @@ def process_csv_files(csv_dir, json_data, masterlog, fasta_name):
             for sample in passing_samples:
                 output = df_masterlog.loc[df_masterlog['WSLH ID'] == sample, report_name]
 
+                logging.debug("If output is not empty, save information to all_data list")
                 if not output.empty:
                     doc = df_masterlog.loc[df_masterlog['WSLH ID'] == sample, 'DOC']
                     county = df_masterlog.loc[df_masterlog['WSLH ID'] == sample, 'Pt County']
-                    id = df_masterlog.loc[df_masterlog['WSLH ID'] == sample, 'Sequencing ID']
+                    seq_id = df_masterlog.loc[df_masterlog['WSLH ID'] == sample, 'Sequencing ID']
 
                 all_data.append({
                     'Sample ID': sample,
                     'DOC': doc.iloc[0] if not doc.empty else None,
                     'County': county.iloc[0] if not county.empty else None,
-                    'Sequencing ID' : id.iloc[0] if not id.empty else None
+                    'Sequencing ID' : seq_id.iloc[0] if not seq_id.empty else None
                 })
 
+    logging.debug("Added determined fasta file name into fn column")
     for sample in all_data:
         sample['fn'] = fasta_name
 
     return all_data
 
-def joining_information(ml_data, json_data, name):
+def joining_information(ml_data, json_data):
 
+    logging.debug("Setting up year for covv_virus_name columns")
     date = datetime.today().strftime('%Y')
 
     logging.debug("Starting to merge data frames.")
@@ -95,29 +103,25 @@ def joining_information(ml_data, json_data, name):
     static_columns = json_data.get('static_columns', [])
     static_columns = pd.DataFrame(static_columns, index=[0])
 
-    column_order = json_data.get('required_columns', [])
-
     logging.debug("Merging static columns and ml data")
     merged = pd.DataFrame.merge(ml, static_columns, how='cross')
 
-    logging.debug("Updating with proper formatting.")
+    logging.debug("Updating with proper formatting and filling in empty covv location.")
     merged['covv_location'] = merged['covv_location'] + " / " + merged['County'].str.capitalize()
     merged['covv_location'] = merged["covv_location"].fillna("North America / USA / Wisconsin")
     merged['covv_location'] = merged['covv_location'].str.lstrip("/")
+
+    logging.debug("Reformatting covv virus name")
     merged['covv_virus_name'] = merged['covv_virus_name'] + ml['Sequencing ID'] + "/" + date
+
+    logging.debug("Reformatting and renaming DOC to covv collection date.")
     merged = merged.rename(columns={"DOC":"covv_collection_date"})
     merged['covv_collection_date'] = pd.to_datetime(merged['covv_collection_date'], format='%m/%d/%Y').dt.strftime('%Y-%m-%d')
-
-
 
     logging.debug("Dropping columns.")
     merged = merged.drop(columns=['County'])
     merged = merged.drop(columns=['Sequencing ID'])
     merged = merged.drop(columns=['Sample ID'])
-
-    merged.reindex(columns=column_order)
-
-    # merged.to_csv(name, index=False)
 
     return merged
 
@@ -125,19 +129,17 @@ def write_output_file(output_file, json, data):
 
     required_columns = json.get('required_columns', [])
 
-    # Add missing columns as NaN
+    logging.debug("Add missing columns based on the required columns in the json file")
     for header in required_columns:
         if header not in data.columns:
             logging.warning(f"Adding missing column: {header}")
-            data[header] = None  # Or use pd.NA for explicitly Pandas' NA value
+            data[header] = None
 
-    # Reorder columns to match the required order
+    logging.debug("Reorder columns to match the required order in json file")
     data = data[required_columns]
 
-    # Write the reordered DataFrame to the output file
+    logging.debug("Write the reordered DataFrame to the output file")
     data.to_csv(output_file, index=False)
-
-    # out.to_csv(output_file, sep='\t')
 
 def write_fasta_file(fasta_name):
 
@@ -149,7 +151,7 @@ def main(args=None):
     json_data = load_json(args.json_file)
     output_file_name, fasta_name = determine_output_names()
     masterlog_data = process_csv_files(args.path_to_output_csvs, json_data, args.masterlog, fasta_name)
-    final_data = joining_information(masterlog_data, json_data, output_file_name)
+    final_data = joining_information(masterlog_data, json_data)
     write_output_file(output_file_name, json_data, final_data)
     write_fasta_file(fasta_name)
 
