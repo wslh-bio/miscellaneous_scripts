@@ -38,6 +38,7 @@
         "covv_passage": "Original",
         "covv_location": "North America / USA / Wisconsin",
         "covv_host": "Human",
+        "covv_sampling_strategy":"Baseline Surveillance",
         "covv_gender": "unknown",
         "covv_patient_age": "unknown",
         "covv_patient_status": "unknown",
