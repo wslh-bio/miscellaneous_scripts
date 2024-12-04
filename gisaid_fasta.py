@@ -133,21 +133,31 @@ def determine_output_name(date):
 def create_fasta_file(dictionary, path, output_name):
 
     for filename in os.listdir(path):
+        logging.debug("Creating full path to access fasta files")
         full_path = "./"+path+"/"+filename
-        for record in SeqIO.parse(full_path, "fasta"):
-            if os.path.exists(output_name):
-                with open(output_name, "a") as out:
-                    SeqIO.write(record, out, "fasta")
-            else:
-                with open(output_name, "w") as out:
-                    SeqIO.write(record, out, "fasta")
-    sys.exit(0)
-        # actual_path = "/"+ path + filename
-        # with open(actual_path, "r"):
-        #     logging.debug(f"Processing {filename}")
-        #     records = SeqIO.parse(actual_path, "fasta")
-        #     print(records)
-        #     sys.exit(0)
+
+        with open(full_path, "r") as infile:
+            records = []
+
+            logging.debug(f"Processing fasta {full_path}")
+            for record in SeqIO.parse(infile, "fasta"):
+
+                logging.debug("Aligning filted, unfiltered, and de-id'ed names.")
+                for filtered_name, alternative_name in dictionary.items():
+                    if filtered_name in record.id:
+                        record.id = alternative_name 
+                        record.description = alternative_name
+
+                logging.debug("Adding records to record list")
+                records.append(record)
+
+        logging.debug(f"Writing {output_name} fasta output file.")
+        if os.path.exists(output_name):
+            with open(output_name, "a") as outfile:
+                SeqIO.write(records, outfile, "fasta")
+        else:
+            with open(output_name, "a") as outfile:
+                SeqIO.write(records, outfile, "fasta")
 
 def main(args=None):
     args = parse_args(args)
