@@ -11,7 +11,7 @@ import pandas as pd
 from datetime import datetime
 from io import StringIO
 
-# logging.basicConfig(level = logging.DEBUG, format = '%(levelname)s : %(message)s', force = True)
+logging.basicConfig(level = logging.DEBUG, format = '%(levelname)s : %(message)s', force = True)
 
 def parse_args(args=None):
     description= 'Pull consensus sequences from viralrecon WSLH report.'
