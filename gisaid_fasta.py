@@ -7,10 +7,12 @@ import boto3
 import os
 import re
 
+
 import pandas as pd
 
 from datetime import datetime
 from io import StringIO
+from Bio import SeqIO
 
 logging.basicConfig(level = logging.DEBUG, format = "%(levelname)s : %(message)s", force = True)
 
@@ -122,6 +124,31 @@ def pull_consensus_seqs(uri_to_seqs, ids, output_path):
         except Exception as e:
             logging.error(f"Downloading {id_key} failed: {e}")
 
+def determine_output_name(date):
+
+    output_file_name = date + "_upload.fasta"
+
+    return output_file_name
+
+def create_fasta_file(dictionary, path, output_name):
+
+    for filename in os.listdir(path):
+        full_path = "./"+path+"/"+filename
+        for record in SeqIO.parse(full_path, "fasta"):
+            if os.path.exists(output_name):
+                with open(output_name, "a") as out:
+                    SeqIO.write(record, out, "fasta")
+            else:
+                with open(output_name, "w") as out:
+                    SeqIO.write(record, out, "fasta")
+    sys.exit(0)
+        # actual_path = "/"+ path + filename
+        # with open(actual_path, "r"):
+        #     logging.debug(f"Processing {filename}")
+        #     records = SeqIO.parse(actual_path, "fasta")
+        #     print(records)
+        #     sys.exit(0)
+
 def main(args=None):
     args = parse_args(args)
     for uri in args.wslh_reports:
@@ -130,6 +157,9 @@ def main(args=None):
         filtered_passing_samples, nonfiltered_passing_samples = process_reports_for_passing_samples(uri)
         dictionary_of_deidentified = get_deidentified_ids(args.masterlog, filtered_passing_samples)
         pull_consensus_seqs(matching_sequence_uri, nonfiltered_passing_samples, path)
+        output = determine_output_name(date)
+        create_fasta_file(dictionary_of_deidentified, path, output)
+
 
 if __name__ == "__main__":
     sys.exit(main())
