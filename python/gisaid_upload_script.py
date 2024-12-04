@@ -32,14 +32,13 @@ def load_json(json_file):
 
     return json_data
 
-def determine_output_names():
+def determine_output_name():
 
     logging.debug("Creating file names based on date.")
     upload_date = datetime.today().strftime('%Y-%m-%d')
     output_file_name = upload_date + "_EpiCoV_BulkUpload.csv"
-    fn_output_name = upload_date + "_upload.fasta"
 
-    return output_file_name, fn_output_name
+    return output_file_name
 
 def process_csv_files(csv_dir, json_data, masterlog, fasta_name):
 
@@ -47,7 +46,6 @@ def process_csv_files(csv_dir, json_data, masterlog, fasta_name):
     all_data = []
 
     df_masterlog = pd.read_csv(masterlog, on_bad_lines='skip', sep="\t")
-
 
     logging.debug("Going through each file in the directory.")
     for filename in os.listdir(csv_dir):
@@ -141,19 +139,14 @@ def write_output_file(output_file, json, data):
     logging.debug("Write the reordered DataFrame to the output file")
     data.to_csv(output_file, index=False)
 
-def write_fasta_file(fasta_name):
-
-    pass
-
 def main(args=None):
     args = parse_args(args)
 
     json_data = load_json(args.json_file)
-    output_file_name, fasta_name = determine_output_names()
+    output_file_name, fasta_name = determine_output_name()
     masterlog_data = process_csv_files(args.path_to_output_csvs, json_data, args.masterlog, fasta_name)
     final_data = joining_information(masterlog_data, json_data)
     write_output_file(output_file_name, json_data, final_data)
-    write_fasta_file(fasta_name)
 
 if __name__ == "__main__":
     sys.exit(main())
