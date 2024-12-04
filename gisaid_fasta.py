@@ -12,6 +12,8 @@ import pandas as pd
 from datetime import datetime
 from io import StringIO
 
+logging.basicConfig(level = logging.DEBUG, format = "%(levelname)s : %(message)s", force = True)
+
 def parse_args(args=None):
     description= 'Run viralrecon params to pull consensus sequences.'
     epilog = 'Example usage: python3 viralrecon_pull_consensus.py <WSLH_REPORT_URI> <FASTA_S3_URI>'
@@ -44,16 +46,17 @@ def match_uris(report, sequences):
 
     pattern = r'\d{2}-COVIDSEQ(\d{2}[-_]?\d{2}|\d{2})'
     report_name = report.split("/")[-1]
-    report_batch_number = re.search(pattern, report_name)
+    report_batch = re.search(pattern, report_name)
+    report_batch_number = report_batch.group(1)
 
     for uri in sequences:
-
-        sequence_name = uri.split("/")[-1]
-        seq_batch_number = re.search(pattern, sequence_name)
+        sequence_name = uri.split("/")[-2]
+        seq_batch = re.search(pattern, sequence_name)
+        seq_batch_number = seq_batch.group(1)
         if report_batch_number == seq_batch_number:
             return uri
 
-def process_report(s3_report_uri):
+def process_reports_for_passing_samples(s3_report_uri):
 
     logging.debug("Initializing s3 client")
     s3 = boto3.client('s3')
@@ -78,10 +81,11 @@ def process_report(s3_report_uri):
 
     sep = "_"
     filtered_names = []
+    nonfiltered_names = passing_sample_names
     for sample in passing_sample_names:
         filtered_names.append(sample.split(sep, 1)[0])
 
-    return filtered_names
+    return filtered_names, nonfiltered_names
 
 def get_deidentified_ids(masterlog, passing_samples):
 
@@ -121,18 +125,11 @@ def pull_consensus_seqs(uri_to_seqs, ids, output_path):
 def main(args=None):
     args = parse_args(args)
     for uri in args.wslh_reports:
-        print(uri)
         path, date = make_folder_path(uri)
         matching_sequence_uri = match_uris(uri, args.uris_to_sequences)
-        # if matching_sequence_uri == "":
-        #     logging.critical("Check URIs to ensure the report has its corresponding consensus sequence URI.")
-        #     sys.exit(1)
-        passing_samples = process_report(uri)
-        dictionary_of_deidentified = get_deidentified_ids(args.masterlog, passing_samples)
-        pull_consensus_seqs(matching_sequence_uri, passing_samples, path)
-    # folder_path, date = make_folder_path(args.uri_to_sequences)
-    # passing_ids = process_report(args.wslh_report)
-    # pull_consensus_seqs(args.uri_to_sequences, passing_ids, folder_path)
+        filtered_passing_samples, nonfiltered_passing_samples = process_reports_for_passing_samples(uri)
+        dictionary_of_deidentified = get_deidentified_ids(args.masterlog, filtered_passing_samples)
+        pull_consensus_seqs(matching_sequence_uri, nonfiltered_passing_samples, path)
 
 if __name__ == "__main__":
     sys.exit(main())
