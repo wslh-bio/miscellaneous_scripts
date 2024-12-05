@@ -10,7 +10,7 @@ import pandas as pd
 from datetime import datetime
 from Bio import SeqIO
 
-logging.basicConfig(level = logging.DEBUG, format = "%(levelname)s : %(message)s", force = True)
+logging.basicConfig(level = logging.INFO, format = "%(levelname)s : %(message)s", force = True)
 
 def parse_args(args=None):
     description= ""
