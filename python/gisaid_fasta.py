@@ -41,7 +41,6 @@ def make_folder_path(sequences_uri):
     logging.debug("Getting date for file structure.")
 
     upload_date = datetime.today().strftime('%Y-%m-%d')
-    batch_name = sequences_uri.split("/")[-1]
     filtered_batch_name = re.search(pattern, sequences_uri)
     folder_path = upload_date + "/genomes/" + filtered_batch_name.group(0)
 
@@ -131,9 +130,9 @@ def determine_output_name(date):
 
     output_file_name = date + "_upload.fasta"
 
-    return output_file_name
+    return output_file_name, date
 
-def create_fasta_file(dictionary, path, output_name):
+def create_fasta_file(dictionary, path, output_name, date):
 
     for filename in os.listdir(path):
         logging.debug("Creating full path to access fasta files")
@@ -148,7 +147,7 @@ def create_fasta_file(dictionary, path, output_name):
                 logging.debug("Aligning filted, unfiltered, and de-id'ed names.")
                 for filtered_name, alternative_name in dictionary.items():
                     if filtered_name in record.id:
-                        record.id = alternative_name 
+                        record.id = "hCoV-19/USA/" + alternative_name + "/" + date 
                         record.description = alternative_name
 
                 logging.debug("Adding records to record list")
@@ -170,8 +169,8 @@ def main(args=None):
         filtered_passing_samples, nonfiltered_passing_samples = process_reports_for_passing_samples(uri)
         dictionary_of_deidentified = get_deidentified_ids(args.masterlog, filtered_passing_samples)
         pull_consensus_seqs(matching_sequence_uri, nonfiltered_passing_samples, path)
-        output = determine_output_name(date)
-        create_fasta_file(dictionary_of_deidentified, path, output)
+        output_name, date = determine_output_name(date)
+        create_fasta_file(dictionary_of_deidentified, path, output_name, date)
 
 
 if __name__ == "__main__":

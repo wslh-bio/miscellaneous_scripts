@@ -82,10 +82,6 @@ def process_csv_files(csv_dir, json_data, masterlog):
                     'Sequencing ID' : seq_id.iloc[0] if not seq_id.empty else None
                 })
 
-    with open('sequencing_id.csv', 'w') as f:
-        for line in all_data:
-            f.write(f"{line}\n")
-
     return all_data
 
 def joining_information(ml_data, json_data, fasta_name):
