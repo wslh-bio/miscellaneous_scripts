@@ -14,7 +14,7 @@ from datetime import datetime
 from io import StringIO
 from Bio import SeqIO
 
-logging.basicConfig(level = logging.DEBUG, format = "%(levelname)s : %(message)s", force = True)
+logging.basicConfig(level = logging.INFO, format = "%(levelname)s : %(message)s", force = True)
 
 def parse_args(args=None):
     description= 'Run viralrecon params to pull consensus sequences.'
@@ -163,6 +163,7 @@ def create_fasta_file(dictionary, path, output_name, date):
 
 def main(args=None):
     args = parse_args(args)
+
     for uri in args.wslh_reports:
         path, date = make_folder_path(uri)
         matching_sequence_uri = match_uris(uri, args.uris_to_sequences)
@@ -171,7 +172,6 @@ def main(args=None):
         pull_consensus_seqs(matching_sequence_uri, nonfiltered_passing_samples, path)
         output_name, date = determine_output_name(date)
         create_fasta_file(dictionary_of_deidentified, path, output_name, date)
-
 
 if __name__ == "__main__":
     sys.exit(main())
