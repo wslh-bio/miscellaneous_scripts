@@ -40,7 +40,7 @@ def determine_output_name():
 
     return output_file_name
 
-def process_csv_files(csv_dir, json_data, masterlog, fasta_name):
+def process_csv_files(csv_dir, json_data, masterlog):
 
     logging.debug("Setting up blank list to store information from ml")
     all_data = []
@@ -73,19 +73,15 @@ def process_csv_files(csv_dir, json_data, masterlog, fasta_name):
                 logging.debug("If output is not empty, save information to all_data list")
                 if not output.empty:
                     doc = df_masterlog.loc[df_masterlog['WSLH ID'] == sample, 'DOC']
-                    county = df_masterlog.loc[df_masterlog['WSLH ID'] == sample, 'Pt County']
+                    # county = df_masterlog.loc[df_masterlog['WSLH ID'] == sample, 'Pt County']
                     seq_id = df_masterlog.loc[df_masterlog['WSLH ID'] == sample, 'Sequencing ID']
 
                 all_data.append({
                     'Sample ID': sample,
                     'DOC': doc.iloc[0] if not doc.empty else None,
-                    'County': county.iloc[0] if not county.empty else None,
+                    # 'County': county.iloc[0] if not county.empty else None,
                     'Sequencing ID' : seq_id.iloc[0] if not seq_id.empty else None
                 })
-
-    logging.debug("Added determined fasta file name into fn column")
-    for sample in all_data:
-        sample['fn'] = fasta_name
 
     return all_data
 
@@ -105,7 +101,7 @@ def joining_information(ml_data, json_data):
     merged = pd.DataFrame.merge(ml, static_columns, how='cross')
 
     logging.debug("Updating with proper formatting and filling in empty covv location.")
-    merged['covv_location'] = merged['covv_location'] + " / " + merged['County'].str.capitalize()
+    # merged['covv_location'] = merged['covv_location'] + " / " + merged['County'].str.capitalize()
     merged['covv_location'] = merged["covv_location"].fillna("North America / USA / Wisconsin")
     merged['covv_location'] = merged['covv_location'].str.lstrip("/")
 
@@ -117,7 +113,7 @@ def joining_information(ml_data, json_data):
     merged['covv_collection_date'] = pd.to_datetime(merged['covv_collection_date'], format='%m/%d/%Y').dt.strftime('%Y-%m-%d')
 
     logging.debug("Dropping columns.")
-    merged = merged.drop(columns=['County'])
+    # merged = merged.drop(columns=['County'])
     merged = merged.drop(columns=['Sequencing ID'])
     merged = merged.drop(columns=['Sample ID'])
 
@@ -143,8 +139,8 @@ def main(args=None):
     args = parse_args(args)
 
     json_data = load_json(args.json_file)
-    output_file_name, fasta_name = determine_output_name()
-    masterlog_data = process_csv_files(args.path_to_output_csvs, json_data, args.masterlog, fasta_name)
+    output_file_name = determine_output_name()
+    masterlog_data = process_csv_files(args.path_to_output_csvs, json_data, args.masterlog)
     final_data = joining_information(masterlog_data, json_data)
     write_output_file(output_file_name, json_data, final_data)
 
