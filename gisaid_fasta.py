@@ -36,11 +36,14 @@ def parse_args(args=None):
 
 def make_folder_path(sequences_uri):
 
+    pattern = r'\d{2}-COVIDSEQ\d{2}(?:_\d{2}|-\d{2})?'
+
     logging.debug("Getting date for file structure.")
 
     upload_date = datetime.today().strftime('%Y-%m-%d')
-    batch_name = sequences_uri.split("/")[-2]
-    folder_path = upload_date + "/genomes/" + batch_name
+    batch_name = sequences_uri.split("/")[-1]
+    filtered_batch_name = re.search(pattern, sequences_uri)
+    folder_path = upload_date + "/genomes/" + filtered_batch_name.group(0)
 
     return folder_path, upload_date
 
