@@ -37,8 +37,9 @@ def determine_output_name():
     logging.debug("Creating file names based on date.")
     upload_date = datetime.today().strftime('%Y-%m-%d')
     output_file_name = upload_date + "_EpiCoV_BulkUpload.csv"
+    fasta_name = upload_date + "_upload.fasta"
 
-    return output_file_name
+    return output_file_name, fasta_name
 
 def process_csv_files(csv_dir, json_data, masterlog):
 
@@ -81,9 +82,13 @@ def process_csv_files(csv_dir, json_data, masterlog):
                     'Sequencing ID' : seq_id.iloc[0] if not seq_id.empty else None
                 })
 
+    with open('sequencing_id.csv', 'w') as f:
+        for line in all_data:
+            f.write(f"{line}\n")
+
     return all_data
 
-def joining_information(ml_data, json_data):
+def joining_information(ml_data, json_data, fasta_name):
 
     logging.debug("Setting up year for covv_virus_name columns")
     date = datetime.today().strftime('%Y')
@@ -98,12 +103,10 @@ def joining_information(ml_data, json_data):
     logging.debug("Merging static columns and ml data")
     merged = pd.DataFrame.merge(ml, static_columns, how='cross')
 
-    logging.debug("Updating with proper formatting and filling in empty covv location.")
-    merged['covv_location'] = merged["covv_location"].fillna("North America / USA / Wisconsin")
-    merged['covv_location'] = merged['covv_location'].str.lstrip("/")
-
     logging.debug("Reformatting covv virus name")
     merged['covv_virus_name'] = merged['covv_virus_name'] + ml['Sequencing ID'] + "/" + date
+
+    merged['fn'] = fasta_name
 
     logging.debug("Reformatting and renaming DOC to covv collection date.")
     merged = merged.rename(columns={"DOC":"covv_collection_date"})
@@ -135,9 +138,9 @@ def main(args=None):
     args = parse_args(args)
 
     json_data = load_json(args.json_file)
-    output_file_name = determine_output_name()
+    output_file_name, fasta_name = determine_output_name()
     masterlog_data = process_csv_files(args.path_to_output_csvs, json_data, args.masterlog)
-    final_data = joining_information(masterlog_data, json_data)
+    final_data = joining_information(masterlog_data, json_data, fasta_name)
     write_output_file(output_file_name, json_data, final_data)
 
 if __name__ == "__main__":
