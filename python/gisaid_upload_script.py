@@ -42,16 +42,15 @@ def determine_output_name():
     return output_file_name, fasta_name
 
 def process_csv_files(csv_dir, json_data, masterlog):
-
-    logging.debug("Setting up blank list to store information from ml")
+    logging.debug("Setting up blank list to store information from masterlog.")
     all_data = []
 
+    # Read masterlog file
     df_masterlog = pd.read_csv(masterlog, on_bad_lines='skip', sep="\t")
 
     logging.debug("Going through each file in the directory.")
     for filename in os.listdir(csv_dir):
-
-        logging.debug(f"Processing {filename}")
+        logging.info(f"Processing {filename}")
         csv_path = os.path.join(csv_dir, filename)
         df_csv = pd.read_csv(csv_path)
 
@@ -62,25 +61,32 @@ def process_csv_files(csv_dir, json_data, masterlog):
         logging.debug("Reading in information for mapping columns to each other from masterlog and output file columns.")
         column_mappings = json_data.get('column_mappings', {})
 
-    for required_name, report_name in column_mappings.items():
-        logging.debug(f"The key is {required_name}. The value is {report_name}.")
+        for required_name, report_name in column_mappings.items():
+            logging.debug(f"The key is {required_name}. The value is {report_name}.")
 
-        if report_name in df_masterlog.columns:
-            logging.debug(f"Found column '{report_name}' in df_masterlog.")
+            if report_name in df_masterlog.columns:
+                logging.debug(f"Found column '{report_name}' in df_masterlog.")
 
-            for sample in passing_samples:
-                output = df_masterlog.loc[df_masterlog['WSLH ID'] == sample, report_name]
+                for sample in passing_samples:
+                    output = df_masterlog.loc[df_masterlog['WSLH ID'] == sample, report_name]
 
-                logging.debug("If output is not empty, save information to all_data list")
-                if not output.empty:
-                    doc = df_masterlog.loc[df_masterlog['WSLH ID'] == sample, 'DOC']
-                    seq_id = df_masterlog.loc[df_masterlog['WSLH ID'] == sample, 'Sequencing ID']
+                    if output.empty:
+                        if os.path.exists("Missing_samples_from_masterlog.txt"):
+                            with open("Missing_samples_from_masterlog.txt", "a") as f:
+                                f.write(f"{sample}\n")
+                        else:
+                            with open("Missing_samples_from_masterlog.txt", "w") as f:
+                                f.write(f"Missing samples \n{sample}\n" )
+                    else:
+                        logging.debug("If output is not empty, save information to all_data list")
+                        doc = df_masterlog.loc[df_masterlog['WSLH ID'] == sample, 'DOC']
+                        seq_id = df_masterlog.loc[df_masterlog['WSLH ID'] == sample, 'Sequencing ID']
 
-                all_data.append({
-                    'Sample ID': sample,
-                    'DOC': doc.iloc[0] if not doc.empty else None,
-                    'Sequencing ID' : seq_id.iloc[0] if not seq_id.empty else None
-                })
+                        all_data.append({
+                            'Sample ID': sample,
+                            'DOC': doc.iloc[0] if not doc.empty else None,
+                            'Sequencing ID': seq_id.iloc[0] if not seq_id.empty else None
+                        })
 
     return all_data
 
@@ -121,7 +127,7 @@ def write_output_file(output_file, json, data):
     logging.debug("Add missing columns based on the required columns in the json file")
     for header in required_columns:
         if header not in data.columns:
-            logging.warning(f"Adding missing column: {header}")
+            logging.debug(f"Adding missing column to dataframe: {header}")
             data[header] = None
 
     logging.debug("Reorder columns to match the required order in json file")
@@ -136,6 +142,9 @@ def main(args=None):
     json_data = load_json(args.json_file)
     output_file_name, fasta_name = determine_output_name()
     masterlog_data = process_csv_files(args.path_to_output_csvs, json_data, args.masterlog)
+    if os.path.exists("Missing_samples_from_masterlog.txt"):
+        logging.critical("There are missing samples from the masterlog. Please check the missing samples txt file for which samples are missing.\nStopping creation of bulk upload file.")
+        sys.exit(1)
     final_data = joining_information(masterlog_data, json_data, fasta_name)
     write_output_file(output_file_name, json_data, final_data)
 
