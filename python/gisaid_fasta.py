@@ -172,6 +172,7 @@ def main(args=None):
         pull_consensus_seqs(matching_sequence_uri, nonfiltered_passing_samples, path)
         output_name, date = determine_output_name(date)
         create_fasta_file(dictionary_of_deidentified, path, output_name, date)
+    logging.info("Fasta file written successfully.")
 
 if __name__ == "__main__":
     sys.exit(main())
