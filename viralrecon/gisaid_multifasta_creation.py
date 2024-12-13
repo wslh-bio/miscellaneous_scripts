@@ -120,7 +120,7 @@ def pull_consensus_seqs(uri_to_seqs, ids, output_path):
 
         try:
             s3.download_file(bucket_name, id_key, local_file_path)
-            logging.info(f"Successfully downloaded {id_key}")
+            logging.debug(f"Successfully downloaded {id_key}")
         except s3.exceptions.NoSuchKey:
             logging.error(f"File not found for {id_key}")
         except Exception as e:
@@ -147,12 +147,13 @@ def create_fasta_file(dictionary, path, output_name, date):
                 logging.debug("Aligning filted, unfiltered, and de-id'ed names.")
                 for filtered_name, alternative_name in dictionary.items():
                     if filtered_name in record.id:
-                        record.id = "hCoV-19/USA/" + alternative_name + "/" + date 
+                        record.id = "hCoV-19/USA/" + alternative_name + "/" + date[:4] 
                         record.description = alternative_name
 
                 logging.debug("Adding records to record list")
                 records.append(record)
 
+        output_name = "test.fa"
         logging.debug(f"Writing {output_name} fasta output file.")
         if os.path.exists(output_name):
             with open(output_name, "a") as outfile:
@@ -160,6 +161,17 @@ def create_fasta_file(dictionary, path, output_name, date):
         else:
             with open(output_name, "a") as outfile:
                 SeqIO.write(records, outfile, "fasta")
+
+    return output_name
+
+def sanitize_fasta_file(fasta, output_name):
+    with open(fasta, "r") as input, open(output_name, "w") as output:
+        for record in SeqIO.parse(input, "fasta"):
+            record.id = record.id.replace(record.id, record.id.split(" ")[0])
+            record.description = ""
+            SeqIO.write(record, output, "fasta")
+
+    os.remove(fasta)
 
 def main(args=None):
     args = parse_args(args)
@@ -171,7 +183,9 @@ def main(args=None):
         dictionary_of_deidentified = get_deidentified_ids(args.masterlog, filtered_passing_samples)
         pull_consensus_seqs(matching_sequence_uri, nonfiltered_passing_samples, path)
         output_name, date = determine_output_name(date)
-        create_fasta_file(dictionary_of_deidentified, path, output_name, date)
+        fasta = create_fasta_file(dictionary_of_deidentified, path, output_name, date)
+        sanitize_fasta_file(fasta, output_name)
+
     logging.info("Fasta file written successfully.")
 
 if __name__ == "__main__":
