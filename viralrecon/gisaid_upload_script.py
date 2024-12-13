@@ -97,11 +97,7 @@ def process_csv_files(csv_dir, json_data, masterlog):
 
 def joining_information(ml_data, json_data, fasta_name):
 
-    logging.debug("Setting up year for covv_virus_name columns")
-    date = datetime.today().strftime('%Y')
-
     logging.debug("Starting to merge data frames.")
-    # ml = pd.DataFrame(ml_data)
 
     logging.debug("Setting up json info")
     static_columns = json_data.get('static_columns', [])
@@ -115,22 +111,23 @@ def joining_information(ml_data, json_data, fasta_name):
     merged['covv_collection_date'] = pd.to_datetime(merged['covv_collection_date'], format='%m/%d/%Y').dt.strftime('%Y-%m-%d')
 
     logging.debug("Reformatting covv virus name")
-    # Check and resolve duplicate indices
+    logging.debug("Checking to see if anything is duplicated")
     if merged.index.duplicated().any():
         merged = merged.reset_index(drop=True)
     if ml_data.index.duplicated().any():
         ml_data = ml_data.reset_index(drop=True)
 
-    # Ensure DOC slicing is correct
+    logging.debug("Setting up DOC to be year")
     ml_data['DOC'] = ml_data['DOC'].str[-4:]
 
-    # Ensure indices align (if necessary, join DataFrames explicitly)
+    logging.debug("Makes sure indices align")
     merged = merged.reset_index(drop=True)
     ml_data = ml_data.reset_index(drop=True)
 
-    # Combine the columns
+    logging.debug("Setting up covv_virus_name column with correct format")
     merged['covv_virus_name'] = merged['covv_virus_name'] + ml_data['Sequencing ID'] + "/" + ml_data['DOC']
 
+    logging.debug("Letting fasta name = column fn")
     merged['fn'] = fasta_name
 
     logging.debug("Dropping columns.")
