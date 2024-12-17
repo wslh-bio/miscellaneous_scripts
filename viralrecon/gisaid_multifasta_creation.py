@@ -133,34 +133,36 @@ def determine_output_name(date):
     return output_file_name, date
 
 def create_fasta_file(dictionary, path, output_name, date):
+    # Get the root directory to walk through
+    root_dir = "/".join(path.split("/")[:2])
+    records = []  # List to store all records across all files
 
-    for filename in os.listdir(path):
-        logging.debug("Creating full path to access fasta files")
-        full_path = "./"+path+"/"+filename
+    # Traverse through the root directory and its subdirectories
+    for root, dirs, files in os.walk(root_dir):
+        print(f"Root {root}\ndir {dirs}\n files {files}")
+        for file in files:
+            print(file)
+            full_path = os.path.join(root, file)  # Correctly construct full path
+            logging.debug(f"Processing fasta file: {full_path}")
 
-        with open(full_path, "r") as infile:
-            records = []
+            with open(full_path, "r") as infile:
+                # Parse the fasta file and update record IDs
+                for record in SeqIO.parse(infile, "fasta"):
+                    for filtered_name, alternative_name in dictionary.items():
+                        if filtered_name in record.id:
+                            record.id = f"hCoV-19/USA/{alternative_name}/{date[:4]}"
+                            record.description = alternative_name
+                            print(record)
+                    records.append(record)  # Add updated records to the list
 
-            logging.debug(f"Processing fasta {full_path}")
-            for record in SeqIO.parse(infile, "fasta"):
-
-                logging.debug("Aligning filted, unfiltered, and de-id'ed names.")
-                for filtered_name, alternative_name in dictionary.items():
-                    if filtered_name in record.id:
-                        record.id = "hCoV-19/USA/" + alternative_name + "/" + date[:4] 
-                        record.description = alternative_name
-
-                logging.debug("Adding records to record list")
-                records.append(record)
-
-        output_name = "test.fa"
-        logging.debug(f"Writing {output_name} fasta output file.")
-        if os.path.exists(output_name):
-            with open(output_name, "a") as outfile:
-                SeqIO.write(records, outfile, "fasta")
-        else:
-            with open(output_name, "a") as outfile:
-                SeqIO.write(records, outfile, "fasta")
+    # Write all collected records to the output fasta file
+    output_name = "test.fasta"
+    logging.debug(f"Writing all records to output fasta file: {output_name}")
+    if records:  # Only write if records exist
+        with open(output_name, "w") as outfile:
+            SeqIO.write(records, outfile, "fasta")
+    else:
+        logging.warning("No records were found to write to the output file.")
 
     return output_name
 
@@ -176,17 +178,45 @@ def sanitize_fasta_file(fasta, output_name):
 def main(args=None):
     args = parse_args(args)
 
+    # Persistent lists to collect all passing samples
+    all_filtered_passing_samples = []
+    all_nonfiltered_passing_samples = []
+
     for uri in args.wslh_reports:
         path, date = make_folder_path(uri)
         matching_sequence_uri = match_uris(uri, args.uris_to_sequences)
+
+        # Process current URI and append results to persistent lists
         filtered_passing_samples, nonfiltered_passing_samples = process_reports_for_passing_samples(uri)
-        dictionary_of_deidentified = get_deidentified_ids(args.masterlog, filtered_passing_samples)
+        all_filtered_passing_samples.extend(filtered_passing_samples)
+        all_nonfiltered_passing_samples.extend(nonfiltered_passing_samples)
+
+        # Fetch sequences (but don't write output yet)
         pull_consensus_seqs(matching_sequence_uri, nonfiltered_passing_samples, path)
-        output_name, date = determine_output_name(date)
+
+    # Combine all passing samples and create the final FASTA
+    if all_filtered_passing_samples:
+        logging.debug("Creating the final FASTA file with all passing samples.")
+        
+        # Combine all deidentified IDs across all URIs
+        dictionary_of_deidentified = get_deidentified_ids(args.masterlog, all_filtered_passing_samples)
+        logging.debug(f"Total of dictionary: {len(dictionary_of_deidentified)}")
+
+        # Determine final output name
+        output_name, date = determine_output_name(date)  # Use the last 'date' for naming purposes
+        
+        # Create the FASTA file using the full combined list
         fasta = create_fasta_file(dictionary_of_deidentified, path, output_name, date)
         sanitize_fasta_file(fasta, output_name)
 
-    logging.info("Fasta file written successfully.")
+        logging.info("Final FASTA file written successfully.")
+    else:
+        logging.warning("No passing samples were found. No FASTA file was created.")
+
+    # Log summary of results
+    logging.debug(f"Total filtered passing samples: {len(all_filtered_passing_samples)}")
+    logging.debug(f"Total non-filtered passing samples: {len(all_nonfiltered_passing_samples)}")
+
 
 if __name__ == "__main__":
     sys.exit(main())
