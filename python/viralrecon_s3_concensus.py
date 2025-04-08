@@ -11,24 +11,25 @@ import pandas as pd
 from datetime import datetime
 from io import StringIO
 
-logging.basicConfig(level = logging.INFO, format = '%(levelname)s : %(message)s', force = True)
+# logging.basicConfig(level = logging.DEBUG, format = '%(levelname)s : %(message)s', force = True)
 
 def parse_args(args=None):
-    Description=('Pull consensus sequences from viralrecon WSLH report.')
-    Epilog = 'Example usage: python3 viralrecon_pull_consensus.py <WSLH_REPORT_URI> <FASTA_S3_URI>'
-    parser = argparse.ArgumentParser(description=Description)
+    description= 'Pull consensus sequences from viralrecon WSLH report.'
+    epilog = 'Example usage: python3 viralrecon_pull_consensus.py <WSLH_REPORT_URI> <FASTA_S3_URI>'
+    parser = argparse.ArgumentParser(description=description, epilog=epilog)
     parser.add_argument('wslh_report',
-        help='URI for report to get consensus IDs from.')
+        help='URI report to be get consensus IDs from.')
     parser.add_argument('uri_to_sequences',
         help='URI for directory holding consensus sequences.')
     return parser.parse_args(args)
 
-def make_folder_path():
+def make_folder_path(sequences_uri):
 
     logging.debug("Getting date for file structure.")
 
     upload_date = datetime.today().strftime('%Y-%m-%d')
-    folder_path = upload_date + "/genomes/"
+    batch_name = sequences_uri.split("/")[-2]
+    folder_path = upload_date + "/genomes/" + batch_name
 
     return folder_path, upload_date
 
@@ -58,7 +59,6 @@ def process_report(s3_report_uri):
     return passing_sample_names
 
 def pull_consensus_seqs(uri_to_seqs, ids, output_path):
-
     s3 = boto3.client('s3')
 
     if not os.path.exists(output_path):
@@ -86,7 +86,7 @@ def pull_consensus_seqs(uri_to_seqs, ids, output_path):
 
 def main(args=None):
     args = parse_args(args)
-    folder_path, date = make_folder_path()
+    folder_path, date = make_folder_path(args.uri_to_sequences)
     passing_ids = process_report(args.wslh_report)
     pull_consensus_seqs(args.uri_to_sequences, passing_ids, folder_path)
 
