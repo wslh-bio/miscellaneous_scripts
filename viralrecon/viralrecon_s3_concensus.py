@@ -90,5 +90,9 @@ def main(args=None):
     passing_ids = process_report(args.wslh_report)
     pull_consensus_seqs(args.uri_to_sequences, passing_ids, folder_path)
 
+<<<<<<< HEAD
+=======
+    
+>>>>>>> 8b00b74 (Added updated consensus scripts with batch names in folder paths.)
 if __name__ == "__main__":
     sys.exit(main())

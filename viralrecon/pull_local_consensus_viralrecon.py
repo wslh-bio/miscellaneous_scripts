@@ -30,8 +30,11 @@ def make_folder_path(batch_name):
     logging.debug("Getting date for file structure.")
 
     upload_date = datetime.today().strftime('%Y-%m-%d')
+<<<<<<< HEAD
 
     logging.debug("Creating folder path with batch name.")
+=======
+>>>>>>> 8b00b74 (Added updated consensus scripts with batch names in folder paths.)
     folder_path = upload_date + "/genomes/" + batch_name
 
     return folder_path
