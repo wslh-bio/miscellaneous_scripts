@@ -1,17 +1,16 @@
 #!/usr/bin/env python
-import pandas as pd
-import os
-import sys
-import glob
-import argparse
-from datetime import datetime
 
+import sys
+import argparse
+
+import pandas as pd
+from datetime import datetime
 
 def parse_args(args=None):
     Description = (
         "Generate QC report and NCBI Biosample and SRA spreadsheets for Candida auris submission."
     )
-    Epilog = "Example usage: python CA_post_mycosnp.py -qc <QC_STATS> -m <CAURIS_MASTER_LOG_COPY> -r <BATCH_NAME>"
+    Epilog = "Example usage: python CA_post_mycosnp.py -qc <QC_STATS> -m <CAURIS_MASTER_LOG_COPY> -r <BATCH_NAME> -f combined.csv"
 
     parser = argparse.ArgumentParser(description=Description, epilog=Epilog)
     parser.add_argument(
@@ -39,12 +38,12 @@ def parse_args(args=None):
         dest="FKS_COMBINED",
         help="FKS1 gene combined spreadsheet from Mycosnp-nf.",
     )
-    parser.add_argument(
-        "-c",
-        "--clade_designation",
-        dest="CLADE",
-        help="Clade designation from mash_comparison.py script for Candida auris.",
-    )
+    # parser.add_argument(
+        # "-c",
+        # "--clade_designation",
+        # dest="CLADE",
+        # help="Clade designation from mash_comparison.py script for Candida auris.",
+    # )
     return parser.parse_args(args)
 
 
