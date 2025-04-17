@@ -2,6 +2,7 @@
 
 import sys
 import argparse
+import logging
 
 import pandas as pd
 from datetime import datetime
@@ -63,12 +64,11 @@ def pass_fail (qc_stats):
     
     qc.loc[(pass_fail_criteria), 'pass/fail'] = 'pass'
     qc.loc[(~pass_fail_criteria), 'pass/fail'] = 'fail'
-    
-    #qc.to_csv('test.csv', index=False)
+
     return qc
 
 
-def merge(qc_stats, metadata, run_name):
+def merge(qc_stats, metadata, run_name, fks1):
     # Read csv files
     qc = pd.DataFrame(qc_stats)
     meta = pd.read_csv(metadata, sep='\t')
@@ -115,12 +115,21 @@ def merge(qc_stats, metadata, run_name):
         'fks1 mut',
         'Comments'
     ]
-    merged_df.to_csv(run_name+'_qc_report.csv', columns=qc_report_columns, index=False)
- 
+
+    df_fks1 = pd.read_csv(fks1)
+    fks1_df = df_fks1.rename(columns = {"sample_id":"Sample Name"})
+    fks1_df = fks1_df.drop(['snpeff_gene_name', 'region', 'position', 'ref_sequence', 'sample_sequence'], axis='columns')
+
+    qc_df = pd.merge(merged_df, fks1_df, on="Sample Name", how="outer")
+    qc_df = qc_df.drop("fks1 mut", axis='columns')
+    qc_df = qc_df.rename(columns = {"mutation":"fks1 mut"})
+
+    qc_df['fks1'] = qc_df['fks1 mut'].apply(lambda x: 'DETECTED' if pd.notna(x) and str(x).strip() != '' else 'NOT DETECTED')
+
+    logging.debug("Writing output of merged dataframe to csv")
+    qc_df.to_csv(run_name+'_qc_report.csv', columns=qc_report_columns, index=False)
 
     return merged_df
-
-#def qc_report_creation(prelim_qc_report, fks1, clade_designation)
 
 def ncbi_spreadsheets(all_data, run_name):
 
@@ -184,20 +193,21 @@ def ncbi_spreadsheets(all_data, run_name):
 
 def main(args=None):
     args = parse_args(args)
+
     qc_stats_pass_fail = pass_fail(
         qc_stats=args.QC_STATS
     )
+
     merged_data = merge(
         qc_stats= qc_stats_pass_fail,
         metadata=args.METADATA,
-        #fks_combined=args.FKS_COMBINED,
-        #clade_designation=args.CLADE,
         run_name=args.RUN_NAME,
+        fks1=args.FKS_COMBINED
     )
+
     ncbi_spreadsheets(all_data=merged_data,
               run_name=args.RUN_NAME,
     )
-
 
 if __name__ == "__main__":
     sys.exit(main())
