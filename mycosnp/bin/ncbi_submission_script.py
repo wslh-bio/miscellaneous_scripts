@@ -92,11 +92,21 @@ def merge(qc_stats, metadata, run_name, fks1):
     logging.debug("Merge databases")
     merged_df = pd.merge(qc, meta, on='WSLH Specimen Number', how='inner')
 
+    df_fks1 = pd.read_csv(fks1)
+    fks1_df = df_fks1.rename(columns = {"sample_id":"Sample Name"})
+    fks1_df = fks1_df.drop(['snpeff_gene_name', 'region', 'position', 'ref_sequence', 'sample_sequence'], axis='columns')
+
+    qc_df = pd.merge(merged_df, fks1_df, on="Sample Name", how="outer")
+    qc_df = qc_df.drop("fks1 mut", axis='columns')
+    qc_df = qc_df.rename(columns = {"mutation":"fks1 mut"})
+
+    qc_df['fks1'] = qc_df['fks1 mut'].apply(lambda x: 'DETECTED' if pd.notna(x) and str(x).strip() != '' else 'NOT DETECTED')
+
     logging.debug("Export total data")
-    merged_df.to_csv(run_name+'_total_data.csv', index=False)
+    qc_df.to_csv(run_name+'_total_data.csv', index=False)
 
     logging.debug("Create pass.tsv for renaming files")
-    df_passed = merged_df[merged_df['pass/fail'] == 'pass']
+    df_passed = qc_df[merged_df['pass/fail'] == 'pass']
     df_passed.to_csv("pass.csv", columns=['WSLH Specimen Number', 'HAI WGS ID'], index=False)
 
     logging.debug("Create qc_report columns")
@@ -121,16 +131,6 @@ def merge(qc_stats, metadata, run_name, fks1):
         'fks1 mut',
         'Comments'
     ]
-
-    df_fks1 = pd.read_csv(fks1)
-    fks1_df = df_fks1.rename(columns = {"sample_id":"Sample Name"})
-    fks1_df = fks1_df.drop(['snpeff_gene_name', 'region', 'position', 'ref_sequence', 'sample_sequence'], axis='columns')
-
-    qc_df = pd.merge(merged_df, fks1_df, on="Sample Name", how="outer")
-    qc_df = qc_df.drop("fks1 mut", axis='columns')
-    qc_df = qc_df.rename(columns = {"mutation":"fks1 mut"})
-
-    qc_df['fks1'] = qc_df['fks1 mut'].apply(lambda x: 'DETECTED' if pd.notna(x) and str(x).strip() != '' else 'NOT DETECTED')
 
     logging.debug("Writing output of merged dataframe to csv")
     qc_df.to_csv(run_name+'_qc_report.csv', columns=qc_report_columns, index=False)
