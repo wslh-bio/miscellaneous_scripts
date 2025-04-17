@@ -1,11 +1,16 @@
 #!/usr/bin/env python
 
 import sys
+
 import argparse
 import logging
 
 import pandas as pd
+import numpy as np
+
 from datetime import datetime
+
+logging.basicConfig(level = logging.DEBUG, format = '%(levelname)s : %(message)s')
 
 def parse_args(args=None):
     Description = (
@@ -40,60 +45,61 @@ def parse_args(args=None):
         help="FKS1 gene combined spreadsheet from Mycosnp-nf.",
     )
     # parser.add_argument(
-        # "-c",
-        # "--clade_designation",
-        # dest="CLADE",
-        # help="Clade designation from mash_comparison.py script for Candida auris.",
+    #     "-c",
+    #     "--clade_designation",
+    #     dest="CLADE",
+    #     help="Clade designation from mash_comparison.py script for Candida auris.",
     # )
     return parser.parse_args(args)
 
-
 def pass_fail (qc_stats):
-    # Read csv files
+
+    logging.debug("Read csv files")
     qc = pd.read_csv(qc_stats, sep= '\t')
 
-    # remove "%" from "GC content after trimming"
+    logging.debug('remove "%" from "GC content after trimming"')
     qc['GC After Trimming normalized'] = qc['GC After Trimming'].str.rstrip('%').astype(float)
 
-    # Define pass fail criteria
+    logging.debug("Define pass fail criteria")
     pass_fail_criteria = (
         (qc['GC After Trimming normalized'] >= 42) &
         (qc['GC After Trimming normalized'] <= 47.5) &
         (qc['Average Q Score After Trimming'] >= 28) &
         (qc['Mean Coverage Depth'] >= 20))
-    
+
+    logging.debug("Assigning pass or fail based on if samples do or do not agree with pass/fail criteria.")
     qc.loc[(pass_fail_criteria), 'pass/fail'] = 'pass'
     qc.loc[(~pass_fail_criteria), 'pass/fail'] = 'fail'
 
     return qc
 
-
 def merge(qc_stats, metadata, run_name, fks1):
-    # Read csv files
+
+    logging.debug("Read csv files")
     qc = pd.DataFrame(qc_stats)
     meta = pd.read_csv(metadata, sep='\t')
 
-    # Clip "Sample Name" and put into new column 'WSLH Specimen Number'
+    logging.debug("Clip 'Sample Name' and put into new column 'WSLH Specimen Number'")
     qc['WSLH Specimen Number'] = qc['Sample Name'].str.split('_').str[0].str.split('-').str[0].str.split('a').str[0]
 
-    # Create YYYY-MM for date of collection
+    logging.debug("Create YYYY-MM for date of collection")
     meta['collection_date'] = pd.to_datetime(meta['Collection Date']).dt.strftime('%Y-%m')
 
-    # Create fastq file names
+    logging.debug("Create fastq file names")
     meta['filename'] = meta['HAI WGS ID']+'_R1_001.fastq.gz'
     meta['filename2'] = meta['HAI WGS ID']+'_R2_001.fastq.gz'
 
-    # Merge databases
+    logging.debug("Merge databases")
     merged_df = pd.merge(qc, meta, on='WSLH Specimen Number', how='inner')
 
-    # Export total data
+    logging.debug("Export total data")
     merged_df.to_csv(run_name+'_total_data.csv', index=False)
 
-    # Create pass.tsv for renameing files
+    logging.debug("Create pass.tsv for renaming files")
     df_passed = merged_df[merged_df['pass/fail'] == 'pass']
     df_passed.to_csv("pass.csv", columns=['WSLH Specimen Number', 'HAI WGS ID'], index=False)
 
-    # Create qc_report
+    logging.debug("Create qc_report columns")
     qc_report_columns=[
         'Sample Name',
         'Reads Before Trimming',
@@ -129,14 +135,17 @@ def merge(qc_stats, metadata, run_name, fks1):
     logging.debug("Writing output of merged dataframe to csv")
     qc_df.to_csv(run_name+'_qc_report.csv', columns=qc_report_columns, index=False)
 
-    return merged_df
+    return qc_df
 
 def ncbi_spreadsheets(all_data, run_name):
 
+    logging.debug("Created dataframe from merged data")
     df = pd.DataFrame(all_data)
+
+    logging.debug("Created dataframe with passed samples only")
     df_passed = df[df['pass/fail'] == 'pass']
 
-    # Create a dictionary with column names and corresponding biosample attributes for Biosample
+    logging.debug("Create a dictionary with column names and corresponding biosample attributes for Biosample")
     biosample = {
         'sample_name': df_passed['HAI WGS ID'],
         'sample_title': "",
@@ -153,7 +162,7 @@ def ncbi_spreadsheets(all_data, run_name):
         'lat_lon': "38.00 N 97.00 W"
     }
 
-    # Create a dictionary with column names and corresponding data for SRA
+    logging.debug("Create a dictionary with column names and corresponding data for SRA")
     sra = {
         'sample_name': df_passed['HAI WGS ID'],
         'library_ID': "",
@@ -163,6 +172,7 @@ def ncbi_spreadsheets(all_data, run_name):
         'library_selection': "RANDOM",
         'library_layout': "paired",
         'platform': "Illumina",
+        
         'instrument_model': "Nextseq 2000",
         'design_description': "Illumina DNA prep",
         'filetype': "fastq",
@@ -174,20 +184,20 @@ def ncbi_spreadsheets(all_data, run_name):
         'fasta_file': ""
     }
 
-    # Create DataFrame from the dictionary
+    logging.debug("Create DataFrame from the dictionary")
     df_biosample = pd.DataFrame(biosample)
     df_sra = pd.DataFrame(sra)
 
-    # Name files
+    logging.debug("Name files")
     biosample_file = run_name+'_biosample.tsv'
     sra_file = run_name+'_sra.tsv'
     passed_samples = run_name+'_passed_total_data.tsv'
 
-    # Export csv files
+    logging.debug("Export csv files")
     df_biosample.to_csv(biosample_file, sep='\t', index=False)
     df_sra.to_csv(sra_file, sep='\t', index=False)
 
-    # Export passed total data
+    logging.debug("Export passed total data")
     df_passed.to_csv(passed_samples, sep='\t', index=False)
     df_passed.to_csv("pass.csv", columns=['WSLH Specimen Number', 'HAI WGS ID'], index=False)
 
