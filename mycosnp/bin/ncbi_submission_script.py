@@ -10,7 +10,7 @@ import numpy as np
 
 from datetime import datetime
 
-logging.basicConfig(level = logging.DEBUG, format = '%(levelname)s : %(message)s')
+logging.basicConfig(level = logging.INFO, format = '%(levelname)s : %(message)s')
 
 def parse_args(args=None):
     Description = (
