@@ -16,7 +16,7 @@ def parse_args(args=None):
     Description = (
         "Generate QC report and NCBI Biosample and SRA spreadsheets for Candida auris submission."
     )
-    Epilog = "Example usage: python CA_post_mycosnp.py -qc <QC_STATS> -m <CAURIS_MASTER_LOG_COPY> -r <BATCH_NAME> -f <COMBINED.CSV>"
+    Epilog = "Example usage: python CA_post_mycosnp.py -qc <QC_STATS> -m <CAURIS_MASTER_LOG_COPY> -r <BATCH_NAME> -f <FKS1_COMBINED>"
 
     parser = argparse.ArgumentParser(description=Description, epilog=Epilog)
     parser.add_argument(
