@@ -16,7 +16,7 @@ def parse_args(args=None):
     Description = (
         "Generate QC report and NCBI Biosample and SRA spreadsheets for Candida auris submission."
     )
-    Epilog = "Example usage: python CA_post_mycosnp.py -qc <QC_STATS> -m <CAURIS_MASTER_LOG_COPY> -r <BATCH_NAME> -f combined.csv"
+    Epilog = "Example usage: python CA_post_mycosnp.py -qc <QC_STATS> -m <CAURIS_MASTER_LOG_COPY> -r <BATCH_NAME> -f <COMBINED.CSV>"
 
     parser = argparse.ArgumentParser(description=Description, epilog=Epilog)
     parser.add_argument(
@@ -44,12 +44,6 @@ def parse_args(args=None):
         dest="FKS_COMBINED",
         help="FKS1 gene combined spreadsheet from Mycosnp-nf.",
     )
-    # parser.add_argument(
-    #     "-c",
-    #     "--clade_designation",
-    #     dest="CLADE",
-    #     help="Clade designation from mash_comparison.py script for Candida auris.",
-    # )
     return parser.parse_args(args)
 
 def pass_fail (qc_stats):
