@@ -1,0 +1,22 @@
+{
+    "mounts"   : {
+        "gvfs": [
+            {
+                "comment": "apphost.domain.edu",
+                "host"   : "localhost:4451",
+                "share"  : "/FILES",
+                "local"  : "/home/@USERNAME/mnt/files",
+                "options": "rw",
+                "domain" : "MYDOMAIN"
+            },
+            {
+                "comment": "archivehost.domain.edu - daily backups, etc",
+                "host"   : "localhost:4452",
+                "share"  : "/archive/daily",
+                "local"  : "/home/@USERNAME/mnt/backups",
+                "options": "rw",
+                "domain" : "MYDOMAIN"
+            }
+        ]
+    }
+}
