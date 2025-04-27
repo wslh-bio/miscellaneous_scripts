@@ -129,21 +129,25 @@ The following variables are expanded automatically in the configuration:
     ]
   }
 }
+```
 
 ## Usage
 
 ### Mount Shares
+Mount with the default `gmount.json` in the current directory, or specifiy `-c` to point to a different config file.
 
 ```bash
 ./gmount.py
+
 ```
 
 You will be prompted for your Windows AD password to authenticate with the remote server.
 
 ### Unmount Shares
+Uses `gmount.json` in the current directory or use `-c` to point to a specific config somewhere else.
 
 ```bash
-./gmount.py -u
+./gmount.py -u 
 ```
 
 or
@@ -183,9 +187,6 @@ The script includes comprehensive error handling for common scenarios:
 - File permission problems
 - Timeout handling
 
-## Contributing
-
-Contributions are welcome! Please feel free to submit a Pull Request.
 
 ## License
 
