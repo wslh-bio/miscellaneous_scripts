@@ -249,7 +249,7 @@ class MountManager:
         # Format URL for gio mount command
         gvfs_url = f"smb://{hostname}/{share}"
         
-        log(f"Mounting {gvfs_url}")
+        log(f"Mounting {gvfs_url} ({config['comment']})")
         
         # Use pexpect to handle interactive prompts
         try:
@@ -309,7 +309,7 @@ class MountManager:
                                 log(f"Mount command succeeded but mount not found in gio output. Using expected path: {expected_mount}")
                                 return self.establish_symlink (expected_mount, local_path)
                     else:
-                        warning(f"Failed to mount {gvfs_url} (check connection/password). Exit status was {child.exitstatus}")
+                        warning(f"Failed to mount {gvfs_url} (check connection/password?). Exit status was {child.exitstatus}")
                         return False
                         
                 elif i == 5:  # Timeout
