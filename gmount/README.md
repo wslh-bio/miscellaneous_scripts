@@ -16,7 +16,7 @@ A Python utility for managing GNOME Virtual File System (GVFS) mounts for networ
 
 ## Prerequisites
 
-- Python 3.6+
+- Python 3.10+
 - Pexpect
 - GNOME environment with GVFS support
 - Required Python packages:
