@@ -71,6 +71,15 @@ process {
 withName: '.*' { conda = null }
 }
 ```
+Note: if your modules specify Docker registries like `quay.io/biocontainers/fastqc:0.12.1--hdfd78af_0` you may need to add additional lines to the process block to include those containers without the specified registries to allow Nextflow to use the ECR registry.
+
+```
+process {
+withName: '.*' { conda = null }
+withName: '(.+:)?FASTQC' { container = 'biocontainers/fastqc:0.12.1--hdfd78af_0' }
+withName: '(.+:)?MULTIQC' { container = 'biocontainers/multiqc:1.25.1--pyhdfd78af_0' }
+}
+```
 
 4. Enable Docker and set the registry to the correct ECR registry. Note you will need to replace `<account-id>` and `<region>` with the correct values. If you want to parameterize the registry you can set it by changing: `registry = params.ecr_registry`.
 ```
@@ -79,9 +88,19 @@ docker {
     registry = '<account-id>.dkr.ecr.<region>.amazonaws.com'
 }
 ```
+5. Add the `omics.conf` to the `nextflow.config`. At the end of the nextflow config file add the following to ensure the workflow is run using the omics configuration:  
+```
+includeConfig 'conf/omics.config'
+```
 
 ## Step 4. Stage the images in ECR
 Use the [AWS-HealthOmics-Container-Deploy.py](https://github.com/wslh-bio/miscellaneous_scripts/blob/main/AWSHealthOmics/AWS-HealthOmics-Container-Deploy.py) script to read the container manifest file created in Step 2 and deploy the containers in AWS ECR. Note: you will need to have established your AWS Credentials in your environment in order to stage the images.
 ```
 python3 AWS-HealthOmics-Container-Deploy.py container_image_manifest.json
+```
+
+## Step 5. Compress the workflow in a zip file
+The workflow must be compressed in a zip file to import it into AWS HealthOmics, this zip file also needs to be less than 4MB if uploading directly through the console. If this isn't possible you can load the zip file into S3 and load it. You can sometimes save some space by excluding the `.git/` and `assets/` directories:
+```
+zip -r Workflow-v1.0.zip Workflow/ -x  "Workflow/assets/*" "Workflow/.git/*"
 ```
