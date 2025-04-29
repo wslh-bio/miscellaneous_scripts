@@ -70,16 +70,19 @@ with open(args.container_manifest,'r') as infile:
     container_data = json.load(infile)
 
 for container in container_data['manifest']:
-    sha = False
+    sha = None
     # Pull Container using Docker
     if "@" in container:
-        sha = True
-        repository,tag = container.split("@")
-        logging.info(f"Pulling Docker Image: {repository}@{tag}")
+        repository,sha = container.split("@")
+        tag = sha.split(":")[1]
+        logging.info(f"Pulling Docker Image: {repository}@{sha}")
+        original_image = docker_client.images.pull(repository,sha)
     else:
         repository,tag = container.split(":")
         logging.info(f"Pulling Docker Image: {repository}:{tag}")
-    original_image = docker_client.images.pull(repository,tag)
+        original_image = docker_client.images.pull(repository,tag)
+
+    image_digests = original_image.attrs['RepoDigests'] 
 
     # Create AWS ECR Repository ID if Needed
     if "." in repository.split("/")[0]:
@@ -104,17 +107,26 @@ for container in container_data['manifest']:
             policyText = json.dumps(ecr_repository_access_policy)
         )
 
-    # Re-tag image with new ECR repository
+    # Re-tag and Push image to ECR
     ecr_image = original_image.tag(repositoryURI,tag)
-
-    # Push image to ECR
-    if sha:
-        logging.info(f"Pushing {repositoryURI}@{tag}")
-    else:
-        logging.info(f"Pushing {repositoryURI}:{tag}")
+    logging.info(f"Pushing {repositoryURI}:{tag}")
     response = docker_client.images.push(repository= repositoryURI,tag= tag,auth_config= ecr_auth_config, stream=True,decode=True)
     for data in response:
         id = data.get('id')
         progress = data.get('progress')
         if id and progress:
             logging.info(f"Layer: {id} {progress}")
+    
+    if sha:
+        response = ecr_client.describe_images(
+            repositoryName= ecr_repository, 
+            imageIds = [
+                {'imageDigest': sha,'imageTag': tag}
+            ]
+        )
+        try:
+            logging.info(f"Successfully Pushed {response['imageDetails'][0]['repositoryName']} with Digest: {response['imageDetails'][0]['imageDigest']}")
+        except:
+            logging.error(f"Issues occurred when pushing {ecr_repository} or when verifying correct image digest.")
+    else:
+        logging.info(f'Successfully Pushed {ecr_repository}:{tag}')
