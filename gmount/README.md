@@ -147,7 +147,7 @@ After establishing the initial ssh connection, the tunnels will be connected to 
 
 The initial ssh connection will need to remain open for the tunnels to stay active. Some organizations will restrict access to only the tunnel connections so a terminal session may not be available and you may receive a connection error.  To connect without "logging in" try the `-N` ssh argument. This will only connect to the bastion host and attempt to intiate the tunnel connections without starting a shell/login on the bastion. The `-N` flag will not show any output about the connection so it can be difficult to determine if there are any connection problems. If you suspect issues with the connection, try adding the `-v` or `-vvv` flags along with `-N` and you will see debugging information printed about the connection in real-time.
 
-A [diagram here](gif) illustrates how the various parameters in the ssh connection information are applied.
+A [diagram here](ssh-tunnel.gif) illustrates how the various parameters in the ssh connection information are applied.
 - an ssh connection is established to the bastion host.
 - ssh applies the tunnel configurations to connect to the remote hosts via the established ssh connection.
 
