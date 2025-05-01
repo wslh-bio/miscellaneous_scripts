@@ -102,6 +102,121 @@ The following variables are expanded automatically in the configuration:
   - *Purpose*: Used for file group ownership in mount options
   - *Example*: If group ID is 1000, `"gid=@FS_GID"` becomes `"gid=1000"`
 
+
+# SSH Tunnel Configuration and Usage
+
+SSH tunnels provide a secure way to access network resources over an established ssh connection. 
+
+### Understanding SSH Tunnels
+
+SSH tunnels create encrypted channels between your local machine and remote servers. Tunnels provide a secure transport to resources which are not otherwise directly available to a host. When used with gmount, they allow you to:
+
+- Access shares behind firewalls or bastion hosts
+- Provide an encrypted connection for the data while in transit
+- Provde additional authentication using ssh
+
+### SSH Configuration Example
+
+Add these lines to your SSH configuration file (typically `~/.ssh/config`):
+
+# SSH tunnel configuration example
+### smb over ssh
+
+The configuration below tells `ssh` how to handle a connection to the host `mybastion`. To intiate the connection you would enter `ssh mybastion`. The ssh application will lookup the host in the config file and apply the configured items to the connection automatically, such as using port 2222 instead of the default port 22. This allows for a much simpler command line leaving all the configuration complexity in the config file.
+
+Otherwise, your ssh command might look something like this:
+`ssh mybastion.myorg.edu -p 22222 -L 4451:files.myhost.edut:445 -L 4452:data.myhost.edu:445 -L backups.myhost.edu:445`
+
+`LocalForward` is a keyword that tells ssh to claim a port to use locally (must not be in current use) and forward all traffic received on that port, through the secure SSH tunnel, to the specified remote host and port. After establishing the ssh connection, you can access the remote server over the configured tunnel port. In the case below, this would be `localhost:4451` <> `files.myhost.edu:445`
+
+```bash
+Host mybastion
+  Hostname mybastion.myorg.edu
+  Port 2222
+  LocalForward 4451   files.myhost.edu:445      <-- local port 4451 will forward all traffic to files.myhost.edu on destination port 445
+  LocalForward 4452   data.myhost.edu:445       <-- local port 4452 will do the same for data.myhost.edu
+  LocalForward 4453   backups.myhost.edu:445    <-- local port 4453 for backups.myhost.edu
+```
+
+Each line creates a separate tunnel to a remote server (from the perspective of the bastion host):
+- Listens on a local port (4451, 4452, 4453)
+- Forwards traffic to the specified remote server and port (445)
+- Encrypts all traffic through the SSH connection
+
+After establishing the initial ssh connection, the tunnels will be connected to the remote serviers automatically. It's OK if the hostnames in the ssh tunnel configuration are not resolvable from your device. ssh will use the bastion host's DNS resolovers, after connecting, to find the appropriate hosts to tunnel to. If the DNS hostname is not resolvable, the connection will fail. In this cirucumstance, the IP address may be substituted for the hostname.  If the connection still fails, more investigation will be needed in terms of network or remote host routes, firewalls, access controls, etc.
+
+The initial ssh connection will need to remain open for the tunnels to stay active. Some organizations will restrict access to only the tunnel connections so a terminal session may not be available and you may receive a connection error.  To connect without "logging in" try the `-N` ssh argument. This will only connect to the bastion host and attempt to intiate the tunnel connections without starting a shell/login on the bastion. The `-N` flag will not show any output about the connection so it can be difficult to determine if there are any connection problems. If you suspect issues with the connection, try adding the `-v` or `-vvv` flags along with `-N` and you will see debugging information printed about the connection in real-time.
+
+A [diagram here](gif) illustrates how the various parameters in the ssh connection information are applied.
+- an ssh connection is established to the bastion host.
+- ssh applies the tunnel configurations to connect to the remote hosts via the established ssh connection.
+
+# gmount configuration example
+Gmount was developed explicitly for use with ssh tunnels so the example configuration below uses locally forwarded ports as reviewed above. 
+```json
+{
+  "mounts": {
+    "gvfs": [
+      {
+        "comment": "remote files from host blah"                  # free-form comment
+        "host"   : "localhost:4451",                              # hostname or a localhost tunnel and port
+        "share"  : "share_name",                                  # the name of the windows share to mount
+        "local"  : "/home/@USERNAME/mounts/share",                # where the symlink to the mount will be created*
+        "domain" : "YOURDOMAIN"                                   # the windows Active Directory domain to use
+      }
+    ]
+  }
+}
+
+* GFVS mounts everything under /var/run/user/$UID/gvfs and is not configurable
+```
+
+# Mounting an s3 bucket with gmount (via rclone)
+If you install `rclone`, you can configure a second backend in gmount for an s3 bucket. First, configure rclone for the aws account containing the bucket you want to use. Then, add that gclone reference to the `gmount.json` file. An example config may now be extended for s3 to look something like:
+```json
+{
+  "mounts": {
+    "gvfs": [
+      {
+        "comment": "remote files from host blah"
+        "host"   : "localhost:4451",
+        "share"  : "share_name",
+        "local"  : "/home/@USERNAME/mounts/share",
+        "domain" : "YOURDOMAIN"
+      }
+    ],
+    "s3": [
+      {         
+        "comment": "S3 293 bucket",                               # free-form comment
+        "backend": "rclone",                                      # default is rclone. maybe something else in the future
+        "config" : "/home/@USERNAME/.config/rclone/rclone.conf",  # where to find the rclone config for this bucket
+        "local"  : "/home/@USERNAME/mnt/my-bucket-0382",          # where the bucket will be mounted
+        "remote" : "acloud:/my-bucket-0382"                       # the rclone config block name and literal bucket name to mount
+      }
+    ]
+  }
+}
+```
+
+The associated rclone configuration block below was configured for `env_auth`. This means rclone will expect to find the needed AWS connection information exported to the environment. Prior to running gmount with an S3 configuration, you will need to export `AWS_ACCESS_KEY_ID`, `AWS_REGION` and `AWS_SECRET_ACCESS_KEY` to your environment.  Other authentication methods exist in rclone if this one is not suitable but be aware that saving AWS credentials to a file may pose a substantial security risk to your org.
+```
+[acloud]
+type      = s3
+provider  = AWS
+env_auth  = true
+region    = us-east-2
+acl       = private
+server_side_encryption = AES256
+```
+
+
+### Important Notes
+
+- Make sure SSH connections are established and active before mounting shares
+- Use the same port numbers in both SSH and gmount configurations
+- The ssh login/tunnel must remain active for the duration of the mount
+- Save often/backup regularly. Network disruption of mounted filesystem can lead to file corruption.
+
 ### Example Configuration
 
 ```json
@@ -168,15 +283,10 @@ or
 2. For each configured mount point:
    - It checks if the mount already exists
    - Creates the local directory structure or symlink as needed
-   - Uses `gio mount` to connect to the remote SMB share
-   - Handles authentication via password prompt
-   - Creates symbolic links to the actual GVFS mount points
-
-## Classes and Components
-
-- **PassManager**: Handles user authentication credentials
-- **MountManager**: Main class for handling mount operations
-- **Logging Functions**: Color-coded terminal output for various message types
+   - Uses `gio mount` to connect to remote SMB shares
+   - Uses `rclone` for connecting to S3 buckets
+   - Handles authentication via password prompt (or exported environment vars in case of rclone)
+   - Creates symbolic links to the GVFS mount points under `/run/user/$UID/gvfs`
 
 ## Error Handling
 
