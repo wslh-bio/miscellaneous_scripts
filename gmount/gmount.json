@@ -1,0 +1,33 @@
+{
+    "mounts"   : {
+        "s3": [
+            {
+                "comment": "Backup bucket in rclone configuration for 'acloud' account",
+                "backend": "rclone",
+                "config" : "/home/@USERNAME/.config/rclone/rclone.conf",
+                "local"  : "/home/@USERNAME/mnt/my-backup-bucket-0382",
+                "remote" : "acloud:/my-backup-bucket-0382"
+            }
+         ],
+        "gvfs": [
+            {
+                "comment": "A windows share over ssh",
+                "host"   : "localhost:4453",
+                "share"  : "/DATA",
+                "local"  : "/home/@USERNAME/mnt/data",
+                "options": "rw",
+                "domain" : "MYDOMAIN"
+            }
+        ],
+        "cifs": [
+            {
+                "comment": "Windows file server share",
+                "host"   : "fileserver",
+                "share"  : "projects",
+                "local"  : "/home/@USERNAME/mnt/projects",
+                "domain" : "MYDOMAIN",
+                "options": "username=@USERNAME,rw,uid=@USER_UID,gid=@USER_GID,file_mode=0644,dir_mode=0755,vers=3.0"
+            }
+        ]
+    }
+}
