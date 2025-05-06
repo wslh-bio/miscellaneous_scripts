@@ -18,6 +18,16 @@
                 "options": "rw",
                 "domain" : "MYDOMAIN"
             }
+        ],
+        "cifs": [
+            {
+                "comment": "Windows file server share",
+                "host"   : "fileserver",
+                "share"  : "projects",
+                "local"  : "/home/@USERNAME/mnt/projects",
+                "domain" : "MYDOMAIN",
+                "options": "username=@USERNAME,rw,uid=@USER_UID,gid=@USER_GID,file_mode=0644,dir_mode=0755,vers=3.0"
+            }
         ]
     }
 }

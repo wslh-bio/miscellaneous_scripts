@@ -230,7 +230,7 @@ class GVFSBackend:
     def umount(self, hostname: str, share: str, local_path: Path) -> bool:
         """Unmount a GVFS share."""
         gvfs_url = None
-        
+
         # Remove symlink if it exists
         if local_path.is_symlink():
             try:

@@ -22,7 +22,7 @@ COLORS = {
 def log(message: str) -> None:
     """
     Log an info message with cyan color.
-    
+
     Args:
         message: The message to log
     """
@@ -31,16 +31,16 @@ def log(message: str) -> None:
 def notice(message: str) -> None:
     """
     Log a notice message with magenta color.
-    
+
     Args:
         message: The message to log
     """
     print(f"{COLORS['magenta']}Notice: {COLORS['light_cyan']}{message}{COLORS['reset']}")
-    
+
 def log_ok(message: str) -> None:
     """
     Log a success message with green color.
-    
+
     Args:
         message: The message to log
     """
@@ -50,7 +50,7 @@ def log_ok(message: str) -> None:
 def warning(message: str) -> None:
     """
     Log a warning message with yellow color.
-    
+
     Args:
         message: The warning message
     """
@@ -60,7 +60,7 @@ def warning(message: str) -> None:
 def error(message: str, exit_code: Optional[int] = 1) -> None:
     """
     Log an error message with red color and optionally exit.
-    
+
     Args:
         message: The error message
         exit_code: If not None, exit with this code; otherwise just log
@@ -73,7 +73,7 @@ def error(message: str, exit_code: Optional[int] = 1) -> None:
 def break_handler(sig, frame) -> None:
     """
     Handle keyboard interrupts (CTRL+C) by cleaning up before exiting.
-    
+
     Args:
         sig: Signal number
         frame: Current stack frame
@@ -86,7 +86,7 @@ def break_handler(sig, frame) -> None:
 def get_user_ids() -> Dict[str, str]:
     """
     Retrieve user ID and group ID using system commands.
-    
+
     Returns:
         Dictionary with 'u_id' and 'g_id' keys
     """
