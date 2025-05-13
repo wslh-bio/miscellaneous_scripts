@@ -42,7 +42,7 @@ A Python utility for managing GNOME Virtual File System (GVFS) mounts for networ
 
 ## Configuration
 
-Create a `gmount.json` file in the same directory as the script. This configuration file defines the network shares you want to mount and how they should be accessed.
+Create a `gmount.json` file in the same directory as the script. This configuration file defines the network shares you want to mount and how they should be accessed. You can also create this configuration file in a different location and use the `--config` parameter to point to it. Otherwise, `gmount` will use the configuration in the current directory.
 
 ### Configuration Structure
 
@@ -65,7 +65,7 @@ Create a `gmount.json` file in the same directory as the script. This configurat
 ### Configuration Fields
 
 - **mounts**: The root object containing all mount definitions
-  - **gvfs**: An array of GVFS mount configurations (currently the only supported mount type)
+  - **gvfs**: An array of GVFS (backend) mount configurations (currently the only supported mount type). Other backend options include `cifs` and `s3`. Others may be added. 
     - **host**: The hostname or IP address of the remote file server
       - Identifies the network location of the server hosting the share
       - *Example*: `"fileserver.company.com"` or `"192.168.1.100"`
@@ -209,6 +209,53 @@ acl       = private
 server_side_encryption = AES256
 ```
 
+
+# Mounting a windows share using the CIFS backend
+The addition of the `cifs` backend allows you to mount a remote windows share using your windows credentials. Some windows shares will mount over `gfvs` just fine, while other types do not seem to currently work (such as a user home directory). By adding a `cifs` block to your configuration, `gmount` will use the CIFS protocol to mount the share when `gvfs` cannot.
+
+Mounting via CIFS will require root access. An example suoders file below (`mount-fs`) allows the user `user101` to perform mount options as root, via sudo, without entering their password.  Be aware this does give `user101` elevated access to mount or un-mount ANY filesystem on the host. Sudo can be configured to be more restrictive. This is just an easy-to-implement example.
+```
+{
+  "mounts": {
+    "gvfs": [
+      {
+        "comment": "remote files from host blah"
+        "host"   : "localhost:4451",
+        "share"  : "share_name",
+        "local"  : "/home/@USERNAME/mounts/share",
+        "domain" : "YOURDOMAIN"
+      }
+    ],
+    "s3": [
+      {         
+        "comment": "S3 293 bucket",                               # free-form comment
+        "backend": "rclone",                                      # default is rclone. maybe something else in the future
+        "config" : "/home/@USERNAME/.config/rclone/rclone.conf",  # where to find the rclone config for this bucket
+        "local"  : "/home/@USERNAME/mnt/my-bucket-0382",          # where the bucket will be mounted
+        "remote" : "acloud:/my-bucket-0382"                       # the rclone config block name and literal bucket name to mount
+      }
+    ],
+    "cifs": [
+      {
+        "comment": "Windows file server share",
+        "host"   : "fileserver",
+        "share"  : "projects",
+        "local"  : "/home/@USERNAME/mnt/projects",
+        "domain" : "MYDOMAIN",
+        "options": "username=@USERNAME,rw,uid=@USER_UID,gid=@USER_GID,file_mode=0644,dir_mode=0755,vers=3.0"
+      }
+    ]
+  }
+}
+```
+
+# sudoers.d/mount-fs 
+  * secure this further by
+      * allow access instead to mount "helper" scripts instead of the raw mount commands
+      * remove NOPASSWD to require the user to enter their password for use with `sudo`
+```
+user101 ALL=(ALL:ALL) NOPASSWD: /usr/bin/mount, /usr/bin/umount, /sbin/mount.cifs
+```
 
 ### Important Notes
 
