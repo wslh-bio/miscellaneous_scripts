@@ -3,7 +3,7 @@ import subprocess
 from pathlib import Path
 from typing import Dict, Optional, Tuple
 import time
-from utils import log, log_ok, warning
+from utils import log, log_ok, warning, notice
 
 class RcloneBackend:
     def __init__(self):
@@ -152,7 +152,7 @@ class RcloneBackend:
             if self.is_mount_ready(local_path):
                 log_ok(f"Successfully mounted {remote_path} to {local_path}")
             else:                
-                log.notice (f"rclone command for {remote_path} was successful but {local_path} may not yet be active.")            
+                notice (f"rclone command for {remote_path} was successful but {local_path} may not yet be active.")            
         except subprocess.CalledProcessError as e:
             warning(f"Failed to mount {remote_path} to {local_path}: {e}")
             return False
