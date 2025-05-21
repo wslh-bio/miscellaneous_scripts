@@ -33,11 +33,16 @@ docker_client = docker.from_env()
 
 
 ### Get AWS ECR Auth Token (Valid for 12 hours)
-ecr_auth_response = ecr_client.get_authorization_token()
+try:
+    ecr_auth_response = ecr_client.get_authorization_token()
 
-ecr_username, ecr_password = base64.b64decode(ecr_auth_response['authorizationData'][0]['authorizationToken']).decode("utf-8").split(":")
-ecr_registry = ecr_auth_response['authorizationData'][0]['proxyEndpoint'].replace("https://",'')
-logging.info(f'ECR Authorization Obtained, expires: {ecr_auth_response['authorizationData'][0]['expiresAt']}')
+    ecr_username, ecr_password = base64.b64decode(ecr_auth_response['authorizationData'][0]['authorizationToken']).decode("utf-8").split(":")
+    ecr_registry = ecr_auth_response['authorizationData'][0]['proxyEndpoint'].replace("https://",'')
+    ecr_expire = ecr_auth_response['authorizationData'][0]['expiresAt']
+except:
+    logging.error("Unable to get ECR Authorization.")
+    sys.exit(1)
+logging.info(f'ECR Authorization Obtained, expires: {ecr_expire}')
 
 ### Create AWS ECR Auth
 ecr_auth_config = {
