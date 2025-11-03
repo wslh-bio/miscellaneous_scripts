@@ -1,57 +1,21 @@
 #!/usr/bin/env python
 
 import sys
-
-import argparse
 import logging
-
-import pandas as pd
-import numpy as np
+import argparse
 
 from datetime import datetime
 
-logging.basicConfig(level = logging.INFO, format = '%(levelname)s : %(message)s')
+import pandas as pd
 
-def parse_args(args=None):
-    Description = (
-        "Generate QC report and NCBI Biosample and SRA spreadsheets for Candida auris submission."
-    )
-    Epilog = "Example usage: python CA_post_mycosnp.py -qc <QC_STATS> -m <CAURIS_MASTER_LOG_COPY> -r <BATCH_NAME> -f <FKS1_COMBINED>"
-
-    parser = argparse.ArgumentParser(description=Description, epilog=Epilog)
-    parser.add_argument(
-        "-qc",
-        "--qc_stats",
-        dest="QC_STATS", 
-        help="File containing QC stats in csv format."
-    )
-    parser.add_argument(
-        "-m",
-        "--metadata",
-        dest="METADATA",
-        help="Copy of Candida auris master log for metadata."
-    )
-    parser.add_argument(
-        "-r",
-        "--run_name",
-        type=str,
-        dest="RUN_NAME",
-        help="Run name or batch of Candida auris in format CA_<machine>_YYMMDD.",
-    )
-    parser.add_argument(
-        "-f",
-        "--fks_combined",
-        dest="FKS_COMBINED",
-        help="FKS1 gene combined spreadsheet from Mycosnp-nf.",
-    )
-    return parser.parse_args(args)
+logging.basicConfig(level = logging.DEBUG, format = '%(levelname)s : %(message)s')
 
 def pass_fail (qc_stats):
 
     logging.debug("Read csv files")
     qc = pd.read_csv(qc_stats, sep= '\t')
 
-    logging.debug('remove "%" from "GC content after trimming"')
+    logging.debug('Remove "%" from "GC content after trimming"')
     qc['GC After Trimming normalized'] = qc['GC After Trimming'].str.rstrip('%').astype(float)
 
     logging.debug("Define pass fail criteria")
@@ -60,15 +24,13 @@ def pass_fail (qc_stats):
         (qc['GC After Trimming normalized'] <= 47.5) &
         (qc['Average Q Score After Trimming'] >= 28) &
         (qc['Mean Coverage Depth'] >= 20))
-
-    logging.debug("Assigning pass or fail based on if samples do or do not agree with pass/fail criteria.")
+    
     qc.loc[(pass_fail_criteria), 'pass/fail'] = 'pass'
     qc.loc[(~pass_fail_criteria), 'pass/fail'] = 'fail'
 
     return qc
 
-def merge(qc_stats, metadata, run_name, fks1):
-
+def merge(qc_stats, metadata, run_name):
     logging.debug("Read csv files")
     qc = pd.DataFrame(qc_stats)
     meta = pd.read_csv(metadata, sep='\t')
@@ -86,24 +48,14 @@ def merge(qc_stats, metadata, run_name, fks1):
     logging.debug("Merge databases")
     merged_df = pd.merge(qc, meta, on='WSLH Specimen Number', how='inner')
 
-    df_fks1 = pd.read_csv(fks1)
-    fks1_df = df_fks1.rename(columns = {"sample_id":"Sample Name"})
-    fks1_df = fks1_df.drop(['snpeff_gene_name', 'region', 'position', 'ref_sequence', 'sample_sequence'], axis='columns')
-
-    qc_df = pd.merge(merged_df, fks1_df, on="Sample Name", how="outer")
-    qc_df = qc_df.drop("fks1 mut", axis='columns')
-    qc_df = qc_df.rename(columns = {"mutation":"fks1 mut"})
-
-    qc_df['fks1'] = qc_df['fks1 mut'].apply(lambda x: 'DETECTED' if pd.notna(x) and str(x).strip() != '' else 'NOT DETECTED')
-
     logging.debug("Export total data")
-    qc_df.to_csv(run_name+'_total_data.csv', index=False)
+    merged_df.to_csv(run_name+'_total_data.csv', index=False)
 
-    logging.debug("Create pass.tsv for renaming files")
-    df_passed = qc_df[merged_df['pass/fail'] == 'pass']
+    logging.debug("pass.tsv for renameing files")
+    df_passed = merged_df[merged_df['pass/fail'] == 'pass']
     df_passed.to_csv("pass.csv", columns=['WSLH Specimen Number', 'HAI WGS ID'], index=False)
 
-    logging.debug("Create qc_report columns")
+    logging.debug("Create qc_report")
     qc_report_columns=[
         'Sample Name',
         'Reads Before Trimming',
@@ -125,18 +77,13 @@ def merge(qc_stats, metadata, run_name, fks1):
         'fks1 mut',
         'Comments'
     ]
+    merged_df.to_csv(run_name+'_qc_report.csv', columns=qc_report_columns, index=False)
 
-    logging.debug("Writing output of merged dataframe to csv")
-    qc_df.to_csv(run_name+'_qc_report.csv', columns=qc_report_columns, index=False)
-
-    return qc_df
+    return merged_df
 
 def ncbi_spreadsheets(all_data, run_name):
 
-    logging.debug("Created dataframe from merged data")
     df = pd.DataFrame(all_data)
-
-    logging.debug("Created dataframe with passed samples only")
     df_passed = df[df['pass/fail'] == 'pass']
 
     logging.debug("Create a dictionary with column names and corresponding biosample attributes for Biosample")
@@ -166,7 +113,6 @@ def ncbi_spreadsheets(all_data, run_name):
         'library_selection': "RANDOM",
         'library_layout': "paired",
         'platform': "Illumina",
-        
         'instrument_model': "Nextseq 2000",
         'design_description': "Illumina DNA prep",
         'filetype': "fastq",
@@ -195,7 +141,27 @@ def ncbi_spreadsheets(all_data, run_name):
     df_passed.to_csv(passed_samples, sep='\t', index=False)
     df_passed.to_csv("pass.csv", columns=['WSLH Specimen Number', 'HAI WGS ID'], index=False)
 
+class CompileResults(argparse.ArgumentParser):
+
+    def error(self, message):
+        self.print_help()
+        sys.stderr.write(f'\nERROR DETECTED: {message}\n')
+
+        sys.exit(1)
+
+def parse_args(args=None):
+    print("hello")
+
+
+
+
+
+#def qc_report_creation(prelim_qc_report, fks1, clade_designation)
+
+
+
 def main(args=None):
+    
     args = parse_args(args)
 
     qc_stats_pass_fail = pass_fail(
@@ -205,13 +171,50 @@ def main(args=None):
     merged_data = merge(
         qc_stats= qc_stats_pass_fail,
         metadata=args.METADATA,
+        fks_combined=args.FKS_COMBINED,
+        clade_designation=args.CLADE,
         run_name=args.RUN_NAME,
-        fks1=args.FKS_COMBINED
     )
 
     ncbi_spreadsheets(all_data=merged_data,
               run_name=args.RUN_NAME,
     )
 
+
 if __name__ == "__main__":
-    sys.exit(main())
+    parser = CompileResults(prog = 'Compiles all of the mycosnp results into a WSLH specific report',
+        description = "Generate QC report and NCBI Biosample and SRA spreadsheets for Candida auris submission.",
+        epilog = "Example usage: python CA_post_mycosnp.py -qc <QC_STATS> -m <CAURIS_MASTER_LOG_COPY> -r <BATCH_NAME> -f <FKS1> -c <CLADE_DESIGNATION>"
+    parser = argparse.ArgumentParser(description=Description, epilog=Epilog)
+    parser.add_argument(
+        "-qc",
+        "--qc_stats",
+        dest="QC_STATS", 
+        help="File containing QC stats in csv format."
+    )
+    parser.add_argument(
+        "-m",
+        "--metadata",
+        dest="METADATA",
+        help="Copy of Candida auris master log for metadata."
+    )
+    parser.add_argument(
+        "-r",
+        "--run_name",
+        type=str,
+        dest="RUN_NAME",
+        help="Run name or batch of Candida auris in format CA_<mbashachine>_YYMMDD.",
+    )
+    parser.add_argument(
+        "-f",
+        "--fks_combined",
+        dest="FKS_COMBINED",
+        help="FKS1 gene combined spreadsheet from Mycosnp-nf.",
+    )
+    parser.add_argument(
+        "-c",
+        "--clade_designation",
+        dest="CLADE",
+        help="Clade designation from mash_comparison.py script for Candida auris.",
+    )
+    return parser.parse_args(args)
