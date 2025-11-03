@@ -24,16 +24,27 @@ def pass_fail (qc_stats):
         (qc['GC After Trimming normalized'] <= 47.5) &
         (qc['Average Q Score After Trimming'] >= 28) &
         (qc['Mean Coverage Depth'] >= 20))
-    
+
+    logging.debug("Assign pass if sample meets criteria above")
     qc.loc[(pass_fail_criteria), 'pass/fail'] = 'pass'
+
+    logging.debug("Assign fail if sample does not meet criteria above")
     qc.loc[(~pass_fail_criteria), 'pass/fail'] = 'fail'
 
     return qc
 
+def create_dataframes(metadata, qc_stats, fks1_combined, clade_designation):
+    logging.debug("Starting to create dataframes")
+    meta_df = pd.read_csv(metadata, sep='\t')
+    qc_df = pd.DataFrame(qc_stats)
+    fks1_df = pd.read_csv(fks1_combined, sep='\t')
+    clade_df = pd.read_csv(clade_designation, sep='\t')
+
+    return meta_df, qc_df, fks1_df, clade_df
+
 def merge(qc_stats, metadata, run_name):
-    logging.debug("Read csv files")
-    qc = pd.DataFrame(qc_stats)
-    meta = pd.read_csv(metadata, sep='\t')
+
+
 
     logging.debug("Clip 'Sample Name' and put into new column 'WSLH Specimen Number'")
     qc['WSLH Specimen Number'] = qc['Sample Name'].str.split('_').str[0].str.split('-').str[0].str.split('a').str[0]
@@ -149,43 +160,11 @@ class CompileResults(argparse.ArgumentParser):
 
         sys.exit(1)
 
-def parse_args(args=None):
-    print("hello")
-
-
-
-
-
-#def qc_report_creation(prelim_qc_report, fks1, clade_designation)
-
-
-
-def main(args=None):
-    
-    args = parse_args(args)
-
-    qc_stats_pass_fail = pass_fail(
-        qc_stats=args.QC_STATS
-    )
-
-    merged_data = merge(
-        qc_stats= qc_stats_pass_fail,
-        metadata=args.METADATA,
-        fks_combined=args.FKS_COMBINED,
-        clade_designation=args.CLADE,
-        run_name=args.RUN_NAME,
-    )
-
-    ncbi_spreadsheets(all_data=merged_data,
-              run_name=args.RUN_NAME,
-    )
-
-
 if __name__ == "__main__":
     parser = CompileResults(prog = 'Compiles all of the mycosnp results into a WSLH specific report',
         description = "Generate QC report and NCBI Biosample and SRA spreadsheets for Candida auris submission.",
         epilog = "Example usage: python CA_post_mycosnp.py -qc <QC_STATS> -m <CAURIS_MASTER_LOG_COPY> -r <BATCH_NAME> -f <FKS1> -c <CLADE_DESIGNATION>"
-    parser = argparse.ArgumentParser(description=Description, epilog=Epilog)
+        )
     parser.add_argument(
         "-qc",
         "--qc_stats",
@@ -217,4 +196,23 @@ if __name__ == "__main__":
         dest="CLADE",
         help="Clade designation from mash_comparison.py script for Candida auris.",
     )
-    return parser.parse_args(args)
+
+    logging.debug("Run parser to call arguments downstream")
+    args = parser.parse_args()
+
+    qc_stats_pass_fail = pass_fail(
+        qc_stats=args.QC_STATS
+    )
+
+    merged_data = merge(
+        qc_stats= qc_stats_pass_fail,
+        metadata=args.METADATA,
+        fks_combined=args.FKS_COMBINED,
+        clade_designation=args.CLADE,
+        run_name=args.RUN_NAME,
+    )
+
+    ncbi_spreadsheets(all_data=merged_data,
+              run_name=args.RUN_NAME,
+    )
+
