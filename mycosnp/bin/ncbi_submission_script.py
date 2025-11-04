@@ -4,6 +4,8 @@ import sys
 import logging
 import argparse
 
+import numpy as np
+
 # from datetime import datetime
 
 import pandas as pd
@@ -75,10 +77,8 @@ def merge_dfs(qc, metadata, fks1, clade):
     logging.debug("Merge databases QC and Metadata")
     merged_df = pd.merge(qc, metadata, on='WSLH Specimen Number', how='inner')
 
-
     logging.debug("Merge databases Merged and FKS1")
     merged_df = pd.merge(merged_df, fks1, on='WSLH Specimen Number', how='left')
-    merged_df.to_csv("debug_merged_fks1.csv", index=False)
 
     logging.debug("Merge databases Merged and clade designation")
     merged_df = pd.merge(merged_df, clade, on='WSLH Specimen Number', how='left')
@@ -95,10 +95,15 @@ def create_qc_reports(merged_df, run_name):
     df_passed.to_csv("pass.csv", columns=['WSLH Specimen Number', 'HAI WGS ID'], index=False)
 
     logging.debug("Drop duplicate columns to replace it with renamed columns")
-    merged_df = merged_df.drop(columns=['Clade'])
+    merged_df = merged_df.drop(columns=['Clade','fks1 mut'], axis=1)
 
-    logging.debug("Rename Subtype_Closest_Match to clade")
+    logging.debug("Rename Subtype_Closest_Match to fks1 mutation")
     merged_df = merged_df.rename(columns={'Subtype_Closest_Match':'Clade'})
+    merged_df = merged_df.rename(columns={'mutation':'fks1 mut'})
+
+    logging.debug("Setting detected or not detected based on if mutation is present")
+    merged_df['fks1'] = np.where(merged_df['fks1 mut'] != "", 'DETECTED', merged_df['fks1'])
+    merged_df['fks1'] = np.where(merged_df['fks1 mut'].isna(), 'NOT DETECTED', merged_df['fks1'])
 
     logging.debug("Setting up columns for qc_report")
     qc_report_columns=[
