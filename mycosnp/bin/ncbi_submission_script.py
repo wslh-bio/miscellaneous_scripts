@@ -229,23 +229,23 @@ if __name__ == "__main__":
     parser.add_argument(
         "-m",
         "--metadata",
-        help="Copy of Candida auris master log for metadata."
+        help="Copy of Candida auris master log for metadata in tsv format."
     )
     parser.add_argument(
         "-r",
         "--run_name",
         type=str,
-        help="Run name or batch of Candida auris in format CA_<mbashachine>_YYMMDD.",
+        help="Run name or batch of Candida auris in format CA_<machine>_YYMMDD.",
     )
     parser.add_argument(
         "-f",
         "--fks1_combined",
-        help="FKS1 gene combined spreadsheet from Mycosnp-nf.",
+        help="FKS1 gene combined spreadsheet from Mycosnp-nf in csv format.",
     )
     parser.add_argument(
         "-c",
         "--clade_designation",
-        help="Clade designation from mash_comparison.py script for Candida auris.",
+        help="Clade designation from sourmash in csv format, from Pre-mycosnp-nf.",
     )
 
     logging.debug("Run parser to call arguments downstream")
