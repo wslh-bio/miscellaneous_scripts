@@ -195,9 +195,9 @@ def ncbi_spreadsheets(all_data, run_name):
     df_sra = pd.DataFrame(sra)
 
     logging.debug("Name files")
-    biosample_file = run_name+'_biosample.tsv'
-    sra_file = run_name+'_sra.tsv'
-    passed_samples = run_name+'_passed_total_data.tsv'
+    biosample_file = run_name + '_biosample.tsv'
+    sra_file = run_name + '_sra.tsv'
+    passed_samples = run_name + '_passed_total_data.tsv'
 
     logging.debug("Export csv files")
     df_biosample.to_csv(biosample_file, sep='\t', index=False)
