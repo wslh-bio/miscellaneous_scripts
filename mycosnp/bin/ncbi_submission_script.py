@@ -12,6 +12,29 @@ import pandas as pd
 
 logging.basicConfig(level = logging.DEBUG, format = '%(levelname)s : %(message)s')
 
+def sanitize_sample_name(dataframe):
+
+    logging.debug("Sanitizing sample names")
+    dataframe['WSLH Specimen Number'] = dataframe['WSLH Specimen Number'].str.split('_').str.get(0)
+
+    return dataframe
+
+def sanitize_clade(dataframe):
+
+    logging.debug("Setting up clade names in dictionary")
+    clade_dict = {'cladeI-':'Clade I',
+                  'cladeII-':'Clade II',
+                  'cladeIII-':'Clade III',
+                  'cladeIV-':'Clade IV',
+                  'cladeV-':'Clade V',
+                  'cladeVI-':'Clade VI'}
+
+    logging.debug("Replacing clade names based on dictionary")
+    for key, value in clade_dict.items():
+        dataframe.loc[dataframe['Clade'].str.contains(key, case=False, na=False), 'Clade'] = value
+
+    return dataframe
+
 def pass_fail (qc_stats):
 
     logging.debug("Read csv files")
@@ -44,13 +67,6 @@ def create_dataframes(metadata, qc_stats, fks1_combined, clade_designation):
     clade_df    = pd.read_csv(clade_designation, sep=',')
 
     return meta_df, qc_df, fks1_df, clade_df
-
-def sanitize_sample_name(dataframe):
-
-    logging.debug("Sanitizing sample names")
-    dataframe['WSLH Specimen Number'] = dataframe['WSLH Specimen Number'].str.split('_').str.get(0)
-
-    return dataframe
 
 def merge_dfs(qc, metadata, fks1, clade):
 
@@ -104,6 +120,9 @@ def create_qc_reports(merged_df, run_name):
     logging.debug("Setting detected or not detected based on if mutation is present")
     merged_df['fks1'] = np.where(merged_df['fks1 mut'] != "", 'DETECTED', merged_df['fks1'])
     merged_df['fks1'] = np.where(merged_df['fks1 mut'].isna(), 'NOT DETECTED', merged_df['fks1'])
+
+    logging.debug("Sanitizing clade for readability")
+    sanitize_clade(merged_df)
 
     logging.debug("Setting up columns for qc_report")
     qc_report_columns=[
