@@ -5,9 +5,6 @@ import logging
 import argparse
 
 import numpy as np
-
-# from datetime import datetime
-
 import pandas as pd
 
 logging.basicConfig(level = logging.DEBUG, format = '%(levelname)s : %(message)s')
@@ -122,7 +119,7 @@ def create_qc_reports(merged_df, run_name):
     merged_df['fks1'] = np.where(merged_df['fks1 mut'].isna(), 'NOT DETECTED', merged_df['fks1'])
 
     logging.debug("Sanitizing clade for readability")
-    sanitize_clade(merged_df)
+    merged_df = sanitize_clade(merged_df)
 
     logging.debug("Setting up columns for qc_report")
     qc_report_columns=[
@@ -254,13 +251,18 @@ if __name__ == "__main__":
     logging.debug("Run parser to call arguments downstream")
     args = parser.parse_args()
 
+    logging.info("Going through ac stats")
     qc_stats_pass_fail = pass_fail(args.qc_stats)
 
+    logging.info("Processing all files")
     meta_df, qc_df, fks1_df, clade_df = create_dataframes(args.metadata, qc_stats_pass_fail, args.fks1_combined, args.clade_designation)
 
+    logging.info("Merging all data")
     merged_data = merge_dfs(qc_df, meta_df, fks1_df, clade_df)
 
+    logging.info("Creating QC reports")
     create_qc_reports(merged_data, args.run_name)
 
+    logging.info("Creating NCBI submission spreadsheets")
     ncbi_spreadsheets(merged_data, args.run_name)
 
