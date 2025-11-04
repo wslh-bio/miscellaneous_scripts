@@ -4,7 +4,7 @@ import sys
 import logging
 import argparse
 
-from datetime import datetime
+# from datetime import datetime
 
 import pandas as pd
 
@@ -34,39 +34,73 @@ def pass_fail (qc_stats):
     return qc
 
 def create_dataframes(metadata, qc_stats, fks1_combined, clade_designation):
+
     logging.debug("Starting to create dataframes")
-    meta_df = pd.read_csv(metadata, sep='\t')
-    qc_df = pd.DataFrame(qc_stats)
-    fks1_df = pd.read_csv(fks1_combined, sep='\t')
-    clade_df = pd.read_csv(clade_designation, sep='\t')
+    meta_df     = pd.read_csv(metadata, sep='\t')
+    qc_df       = pd.DataFrame(qc_stats)
+    fks1_df     = pd.read_csv(fks1_combined, sep=',')
+    clade_df    = pd.read_csv(clade_designation, sep=',')
 
     return meta_df, qc_df, fks1_df, clade_df
 
-def merge(qc_stats, metadata, run_name):
+def sanitize_sample_name(dataframe):
 
+    logging.debug("Sanitizing sample names")
+    dataframe['WSLH Specimen Number'] = dataframe['WSLH Specimen Number'].str.split('_').str.get(0)
 
+    return dataframe
+
+def merge_dfs(qc, metadata, fks1, clade):
 
     logging.debug("Clip 'Sample Name' and put into new column 'WSLH Specimen Number'")
     qc['WSLH Specimen Number'] = qc['Sample Name'].str.split('_').str[0].str.split('-').str[0].str.split('a').str[0]
 
     logging.debug("Create YYYY-MM for date of collection")
-    meta['collection_date'] = pd.to_datetime(meta['Collection Date']).dt.strftime('%Y-%m')
+    metadata['collection_date'] = pd.to_datetime(metadata['Collection Date']).dt.strftime('%Y-%m')
+
+    logging.debug("Renaming FKS1 sample column to ensure proper merge")
+    fks1.rename(columns={"sample_id":"WSLH Specimen Number"}, inplace=True)
+
+    logging.debug("Renaming Clade sample column to ensure proper merge")
+    clade.rename(columns={'Sample':'WSLH Specimen Number'}, inplace=True)
+
+    logging.debug("Sanitize sample names in dataframe before merge")
+    clade = sanitize_sample_name(clade)
+    fks1 = sanitize_sample_name(fks1)
 
     logging.debug("Create fastq file names")
-    meta['filename'] = meta['HAI WGS ID']+'_R1_001.fastq.gz'
-    meta['filename2'] = meta['HAI WGS ID']+'_R2_001.fastq.gz'
+    metadata['filename'] = metadata['HAI WGS ID']+'_R1_001.fastq.gz'
+    metadata['filename2'] = metadata['HAI WGS ID']+'_R2_001.fastq.gz'
 
-    logging.debug("Merge databases")
-    merged_df = pd.merge(qc, meta, on='WSLH Specimen Number', how='inner')
+    logging.debug("Merge databases QC and Metadata")
+    merged_df = pd.merge(qc, metadata, on='WSLH Specimen Number', how='inner')
+
+
+    logging.debug("Merge databases Merged and FKS1")
+    merged_df = pd.merge(merged_df, fks1, on='WSLH Specimen Number', how='left')
+    merged_df.to_csv("debug_merged_fks1.csv", index=False)
+
+    logging.debug("Merge databases Merged and clade designation")
+    merged_df = pd.merge(merged_df, clade, on='WSLH Specimen Number', how='left')
+
+    return merged_df
+
+def create_qc_reports(merged_df, run_name):
 
     logging.debug("Export total data")
-    merged_df.to_csv(run_name+'_total_data.csv', index=False)
+    merged_df.to_csv(run_name +'_total_data.csv', index=False)
 
-    logging.debug("pass.tsv for renameing files")
+    logging.debug("pass.tsv for renaming files")
     df_passed = merged_df[merged_df['pass/fail'] == 'pass']
     df_passed.to_csv("pass.csv", columns=['WSLH Specimen Number', 'HAI WGS ID'], index=False)
 
-    logging.debug("Create qc_report")
+    logging.debug("Drop duplicate columns to replace it with renamed columns")
+    merged_df = merged_df.drop(columns=['Clade'])
+
+    logging.debug("Rename Subtype_Closest_Match to clade")
+    merged_df = merged_df.rename(columns={'Subtype_Closest_Match':'Clade'})
+
+    logging.debug("Setting up columns for qc_report")
     qc_report_columns=[
         'Sample Name',
         'Reads Before Trimming',
@@ -88,9 +122,9 @@ def merge(qc_stats, metadata, run_name):
         'fks1 mut',
         'Comments'
     ]
-    merged_df.to_csv(run_name+'_qc_report.csv', columns=qc_report_columns, index=False)
 
-    return merged_df
+    logging.debug("Creating qc_report file")
+    merged_df.to_csv(run_name + '_qc_report.csv', columns=qc_report_columns, index=False)
 
 def ncbi_spreadsheets(all_data, run_name):
 
@@ -161,6 +195,7 @@ class CompileResults(argparse.ArgumentParser):
         sys.exit(1)
 
 if __name__ == "__main__":
+
     parser = CompileResults(prog = 'Compiles all of the mycosnp results into a WSLH specific report',
         description = "Generate QC report and NCBI Biosample and SRA spreadsheets for Candida auris submission.",
         epilog = "Example usage: python CA_post_mycosnp.py -qc <QC_STATS> -m <CAURIS_MASTER_LOG_COPY> -r <BATCH_NAME> -f <FKS1> -c <CLADE_DESIGNATION>"
@@ -168,51 +203,40 @@ if __name__ == "__main__":
     parser.add_argument(
         "-qc",
         "--qc_stats",
-        dest="QC_STATS", 
         help="File containing QC stats in csv format."
     )
     parser.add_argument(
         "-m",
         "--metadata",
-        dest="METADATA",
         help="Copy of Candida auris master log for metadata."
     )
     parser.add_argument(
         "-r",
         "--run_name",
         type=str,
-        dest="RUN_NAME",
         help="Run name or batch of Candida auris in format CA_<mbashachine>_YYMMDD.",
     )
     parser.add_argument(
         "-f",
-        "--fks_combined",
-        dest="FKS_COMBINED",
+        "--fks1_combined",
         help="FKS1 gene combined spreadsheet from Mycosnp-nf.",
     )
     parser.add_argument(
         "-c",
         "--clade_designation",
-        dest="CLADE",
         help="Clade designation from mash_comparison.py script for Candida auris.",
     )
 
     logging.debug("Run parser to call arguments downstream")
     args = parser.parse_args()
 
-    qc_stats_pass_fail = pass_fail(
-        qc_stats=args.QC_STATS
-    )
+    qc_stats_pass_fail = pass_fail(args.qc_stats)
 
-    merged_data = merge(
-        qc_stats= qc_stats_pass_fail,
-        metadata=args.METADATA,
-        fks_combined=args.FKS_COMBINED,
-        clade_designation=args.CLADE,
-        run_name=args.RUN_NAME,
-    )
+    meta_df, qc_df, fks1_df, clade_df = create_dataframes(args.metadata, qc_stats_pass_fail, args.fks1_combined, args.clade_designation)
 
-    ncbi_spreadsheets(all_data=merged_data,
-              run_name=args.RUN_NAME,
-    )
+    merged_data = merge_dfs(qc_df, meta_df, fks1_df, clade_df)
+
+    create_qc_reports(merged_data, args.run_name)
+
+    ncbi_spreadsheets(merged_data, args.run_name)
 
