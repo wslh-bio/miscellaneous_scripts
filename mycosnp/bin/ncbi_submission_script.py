@@ -91,7 +91,13 @@ def merge_dfs(qc, metadata, fks1, clade):
     merged_df = pd.merge(qc, metadata, on='WSLH Specimen Number', how='inner')
 
     logging.debug("Merge databases Merged and FKS1")
+    # Before the merge, group by specimen number and aggregate mutations
+    fks1 = fks1.groupby('WSLH Specimen Number').agg({
+        'mutation': lambda x: ', '.join(x.dropna().unique())
+    }).reset_index()
+
     merged_df = pd.merge(merged_df, fks1, on='WSLH Specimen Number', how='left')
+
 
     logging.debug("Merge databases Merged and clade designation")
     merged_df = pd.merge(merged_df, clade, on='WSLH Specimen Number', how='left')
