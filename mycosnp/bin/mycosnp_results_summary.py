@@ -162,7 +162,7 @@ if __name__ == "__main__":
     logging.debug("Run parser to call arguments downstream")
     args = parser.parse_args()
 
-    logging.info("Going through ac stats")
+    logging.info("Going through qc stats")
     qc_stats_pass_fail = pass_fail(args.qc_stats)
 
     logging.info("Processing all files")
