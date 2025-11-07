@@ -7,7 +7,7 @@ import argparse
 import numpy as np
 import pandas as pd
 
-logging.basicConfig(level = logging.DEBUG, format = '%(levelname)s : %(message)s')
+logging.basicConfig(level = logging.INFO, format = '%(levelname)s : %(message)s')
 
 def pass_fail (qc_stats):
 
