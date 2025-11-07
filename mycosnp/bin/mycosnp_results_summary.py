@@ -138,11 +138,6 @@ if __name__ == "__main__":
         help="File containing QC stats in csv format."
     )
     parser.add_argument(
-        "-m",
-        "--metadata",
-        help="Copy of Candida auris master log for metadata in tsv format."
-    )
-    parser.add_argument(
         "-r",
         "--run_name",
         type=str,
