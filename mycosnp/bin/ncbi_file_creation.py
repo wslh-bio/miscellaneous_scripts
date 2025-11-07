@@ -7,6 +7,8 @@ import argparse
 import numpy as np
 import pandas as pd
 
+logging.basicConfig(level = logging.DEBUG, format = '%(levelname)s : %(message)s')
+
 def pass_fail (qc_stats):
 
     logging.debug("Read csv files")
@@ -39,10 +41,6 @@ def create_dataframes(metadata, qc_stats):
     return meta_df, qc_df
 
 def merge_dataframes(metadata, qc):
-
-    logging.debug("pass.tsv for renaming files")
-    df_passed = merged_df[merged_df['pass/fail'] == 'pass']
-    df_passed.to_csv("pass.csv", columns=['WSLH Specimen Number', 'HAI WGS ID'], index=False)
 
     logging.debug("Clip 'Sample Name' and put into new column 'WSLH Specimen Number'")
     qc['WSLH Specimen Number'] = qc['Sample Name'].str.split('_').str[0].str.split('-').str[0].str.split('a').str[0]
@@ -119,7 +117,7 @@ def create_ncbi_spreadsheets(all_data, run_name):
     df_passed.to_csv(passed_samples, sep='\t', index=False)
     df_passed.to_csv("pass.csv", columns=['WSLH Specimen Number', 'HAI WGS ID'], index=False)
 
-class MyParser(argparse.ArgumentParser):
+class FileCreationNCBI(argparse.ArgumentParser):
 
     def error(self, message):
         self.print_help()
@@ -127,8 +125,8 @@ class MyParser(argparse.ArgumentParser):
 
         sys.exit(1)
 
-def main():
-    parser = MyParser(prog = 'Creates NBI Biosample and SRA spreadsheets',
+if __name__ == "__main__":
+    parser = FileCreationNCBI(prog = 'Creates NBI Biosample and SRA spreadsheets',
         description = "NCBI Biosample and SRA spreadsheets for Candida auris submission.",
         epilog = "Example usage: python CA_post_mycosnp.py -qc <QC_STATS> -m <CAURIS_MASTER_LOG_COPY>"
         )
@@ -151,9 +149,6 @@ def main():
 
     logging.debug("Run parser to call arguments downstream")
     args = parser.parse_args()
-
-    logging.debug("Format for logging information")
-    logging.basicConfig(level = logging.DEBUG, format = '%(levelname)s : %(message)s')
 
     logging.info("Going through ac stats")
     qc_stats_pass_fail = pass_fail(args.qc_stats)
