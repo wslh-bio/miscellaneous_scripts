@@ -7,14 +7,7 @@ import argparse
 import numpy as np
 import pandas as pd
 
-logging.basicConfig(level = logging.DEBUG, format = '%(levelname)s : %(message)s')
-
-def sanitize_sample_name(dataframe):
-
-    logging.debug("Sanitizing sample names")
-    dataframe['Sample Name'] = dataframe['Sample Name'].str.split('_').str.get(0)
-
-    return dataframe
+logging.basicConfig(level = logging.INFO, format = '%(levelname)s : %(message)s')
 
 def sanitize_clade(dataframe):
 
@@ -77,19 +70,15 @@ def merge_dfs(qc, fks1, clade):
     clade.rename(columns={'Sample':'Sample Name'}, inplace=True)
     clade.rename(columns={'Subtype_Closest_Match':'Clade'}, inplace=True)
 
-    logging.debug("Sanitize sample names in dataframe before merge")
-    clade = sanitize_sample_name(clade)
-    fks1 = sanitize_sample_name(fks1)
-
     logging.debug("Merge databases QC and FKS1")
     fks1 = fks1.groupby('Sample Name').agg({
         'fks1 mut': lambda x: ', '.join(x.dropna().unique())
     }).reset_index()
 
-    merged_df = pd.merge(qc, fks1, on='Sample Name', how='left')
-
+    merged_df = pd.merge(qc, fks1, on='Sample Name', how='outer')
+ 
     logging.debug("Merge databases Merged and clade designation")
-    merged_df = pd.merge(merged_df, clade, on='Sample Name', how='left')
+    merged_df = pd.merge(merged_df, clade, on='Sample Name', how='outer')
 
     return merged_df
 
