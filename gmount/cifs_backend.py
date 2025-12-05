@@ -39,7 +39,15 @@ class CIFSBackend:
         """
         try:
             mount_output = subprocess.check_output(['mount']).decode('utf-8')
-            return any(local_path.as_posix() in line for line in mount_output.splitlines())
+            mount_point_str = local_path.as_posix()
+            # Fix to check for exact match on the mount instead of the substring match originally being done.
+            # For example, /mnt/slh should not match /mnt/slhfile but that's what was happening.
+            # Mount output format: "//server/share on /mount/point type cifs (options)"
+            # check for " on {path} type " string or ending with " on {path}" for an exact match instead.
+            for line in mount_output.splitlines():
+                if f" on {mount_point_str} type " in line or line.endswith(f" on {mount_point_str}"):
+                    return True
+            return False
         except subprocess.CalledProcessError:
             warning("Failed to get mount information from mount command")
             return False
