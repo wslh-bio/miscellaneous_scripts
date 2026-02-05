@@ -45,6 +45,10 @@ workflow WORKFLOW_EXAMPLE {
 
     ch_failed
         .ifEmpty { Channel.value('NO_EMPTY_SAMPLES') }
+        .collectFile(
+                name: 'empty_samples.csv',
+                newLine: true
+            )
         .set{ ch_rejected_file }
 
     REJECTED_SAMPLES (
