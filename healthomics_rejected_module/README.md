@@ -51,9 +51,6 @@ workflow WORKFLOW_EXAMPLE {
         ch_rejected_file,
         "WORKFLOW_NAME"
     )
-
-    ch_all_reads = ch_all_reads.mix(ch_filtered)
-    ch_versions = ch_versions.mix(INPUT_CHECK.out.versions)
 }
 ```
 **If there is no input check in the pipeline, use the map operator to manipulate the input channel to have this format: `[ val(meta), [ reads ] ]`**
