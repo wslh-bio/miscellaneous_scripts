@@ -44,17 +44,16 @@ workflow WORKFLOW_EXAMPLE {
         .set{ ch_failed }
 
     ch_failed
-        .ifEmpty { Channel.value('NO_EMPTY_SAMPLES') }
-        .collectFile(
-                name: 'empty_samples.csv',
-                newLine: true
-            )
+        .ifEmpty('NO_EMPTY_SAMPLES') 
         .set{ ch_rejected_file }
 
     REJECTED_SAMPLES (
         ch_rejected_file,
         "WORKFLOW_NAME"
     )
+
+    ch_all_reads = ch_all_reads.mix(ch_filtered)
+    ch_versions = ch_versions.mix(INPUT_CHECK.out.versions)
 }
 ```
 **If there is no input check in the pipeline, use the map operator to manipulate the input channel to have this format: `[ val(meta), [ reads ] ]`**
