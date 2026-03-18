@@ -10,7 +10,7 @@ A collection of command-line scripts for Linux.
 ## HostCheck
 
 ### Description
-`hostcheck.sh` will take a comma separated list of hosts to check for ping, DNS and well known service ports. It's not a full scanning tool but designed to provide a better view of a host's availability than just ping. It validates DNS integrity, checks for CNAME chains, and runs a connection test to specific TCP ports to see if common services are available.  This was wrenched on with AI 
+`hostcheck.sh` takes a comma separated list of hosts to check for ping, DNS, and well known service ports. It's designed to provide a better view of a host's availability than just ping. It validates DNS integrity, checks for CNAME chains, and runs a connection test to specific TCP ports to see if common services are available. The original concept started as a shell script then run through gemini to colorize, format and clean up. 
 
 ### Key Features
 * **DNS Validation:** Does both forward (A record) and reverse (PTR record) lookups.
@@ -34,5 +34,6 @@ A collection of command-line scripts for Linux.
 * `bash`
 * `dig` (usually part of the `dnsutils` or `bind9-host` package)
 * `ping` (iputils)
+* `nc` (netcat - nice to have, not required)
 
 ---

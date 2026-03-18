@@ -1,6 +1,6 @@
 #!/bin/bash
-# hostcheck.sh — Comprehensive host diagnostics (wrenched on with Gemini)
-# Usage: hostcheck.sh -n host1,host2,192.168.1.10 [-w <timeout>]
+# hostcheck.sh — Comprehensive host diagnostics
+# Usage: hostcheck.sh -n host1,host2,192.168.1.x [-w <timeout>]
 
 # --- Colour Definitions ---
 CYAN='\033[0;36m'
@@ -49,7 +49,7 @@ echo -e "${WHITE}  Host Diagnostics Scan — Timeout: ${TIMEOUT}s${NC}"
 echo -e "${WHITE}  Date: $(date '+%Y-%m-%d %H:%M:%S %Z')${NC}"
 echo -e "${CYAN}====================================================${NC}"
 
-# netcat is good for testing tcp connectivity but not always available, so check for it and fallback to /dev/tcp if missing
+# --- Tool Detection ---
 NC_BIN=$(command -v nc)
 if [[ -z "$NC_BIN" ]]; then
     SCAN_MODE="bash"
@@ -84,8 +84,10 @@ for TARGET in "${ADDR_LIST[@]}"; do
     if [[ $IS_IP -eq 0 ]]; then
         FWD_RAW=$(dig +short +search +time="${TIMEOUT}" +tries=1 "$TARGET" 2>/dev/null)
         FWD_OUT=$(echo "$FWD_RAW" | grep -E '^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$')
-        # Non-IP lines from dig +short are CNAME intermediates
-        mapfile -t CNAME_CHAIN < <(echo "$FWD_RAW" | grep -Ev '^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$' | sed 's/\.$//' | grep -v '^$')
+        
+        # Guard mapfile against empty input
+        [[ -n "$FWD_RAW" ]] && mapfile -t CNAME_CHAIN < <(echo "$FWD_RAW" | grep -Ev '^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$' | sed 's/\.$//' | grep -v '^$')
+        
         [[ ${#CNAME_CHAIN[@]} -gt 0 ]] && CANONICAL_NAME="${CNAME_CHAIN[-1]}"
         FWD_COUNT=$(echo "$FWD_OUT" | grep -c . 2>/dev/null || true)
 
@@ -137,19 +139,16 @@ for TARGET in "${ADDR_LIST[@]}"; do
             CHECK_IPS=$(dig +short +search +time="${TIMEOUT}" +tries=1 "$rname" 2>/dev/null \
                         | grep -E '^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$')
             if echo "$CHECK_IPS" | grep -qx "$RESOLVED_IP"; then
-                echo -e "[${GREEN}OK${NC}] rDNS consistent : ${GREEN}${rname}${NC} → ${GREEN}${RESOLVED_IP}${NC}"
+                echo -e "[${GREEN}OK${NC}] rDNS consistent: ${GREEN}${rname}${NC} → ${GREEN}${RESOLVED_IP}${NC}"
                 RDNS_MATCH=1
             elif [[ -z "$CHECK_IPS" ]]; then
-                echo -e "[${YELLOW}WW${NC}] rDNS consistent : ${YELLOW}${rname}${NC} → ${YELLOW}forward lookup empty${NC}"
+                echo -e "[${YELLOW}WW${NC}] rDNS consistent: ${YELLOW}${rname}${NC} → ${YELLOW}forward lookup empty${NC}"
             else
-                echo -e "[${YELLOW}WW${NC}] rDNS mismatch   : ${YELLOW}${rname}${NC} → ${YELLOW}${CHECK_IPS} (expected ${RESOLVED_IP})${NC}"
+                echo -e "[${YELLOW}WW${NC}] rDNS mismatch  : ${YELLOW}${rname}${NC} → ${YELLOW}${CHECK_IPS} (expected ${RESOLVED_IP})${NC}"
             fi
         done <<< "$REV_OUT"
 
         # Does the queried hostname match any PTR record?
-        # Accept: exact match, label-prefix match, or CNAME canonical name matches PTR
-        # e.g. "miq1" matches PTR "miq1.ad.myorg.parentorg.edu" (label prefix)
-        # e.g. CNAME canonical "miq1.ad.myorg.parentorg.edu" matches PTR exactly
         if [[ $IS_IP -eq 0 ]]; then
             PTR_MATCH=0
             PTR_MATCH_REASON=""
@@ -196,25 +195,20 @@ for TARGET in "${ADDR_LIST[@]}"; do
     echo -e "[--] Port Scan (TCP):"
     for port in "${PORTS[@]}"; do
         LABEL="${PORT_NAMES[$port]}"
-        
-        IS_OPEN=1 # Default to fail
         if [[ "$SCAN_MODE" == "nc" ]]; then
-            # Use netcat: -z (zero-I/O mode), -w (timeout)
             if "$NC_BIN" -z -w "$TIMEOUT" "$RESOLVED_IP" "$port" >/dev/null 2>&1; then
-                IS_OPEN=0
+                echo -e "      [${GREEN}OK${NC}] ${port}/tcp  ${LABEL}  ${GREEN}OPEN${NC}"
+                OPEN_PORTS+=("$port")
+            else
+                echo -e "      [${RED}!!${NC}] ${port}/tcp  ${LABEL}  ${RED}CLOSED/FILTERED${NC}"
             fi
         else
-            # Fallback to Bash /dev/tcp
             if (timeout "$TIMEOUT" bash -c "</dev/tcp/${RESOLVED_IP}/${port}" 2>/dev/null); then
-                IS_OPEN=0
+                echo -e "      [${GREEN}OK${NC}] ${port}/tcp  ${LABEL}  ${GREEN}OPEN${NC}"
+                OPEN_PORTS+=("$port")
+            else
+                echo -e "      [${RED}!!${NC}] ${port}/tcp  ${LABEL}  ${RED}CLOSED/FILTERED${NC}"
             fi
-        fi
-
-        if [[ $IS_OPEN -eq 0 ]]; then
-            echo -e "      [${GREEN}OK${NC}] ${port}/tcp  ${LABEL}  ${GREEN}OPEN${NC}"
-            OPEN_PORTS+=("$port")
-        else
-            echo -e "      [${RED}!!${NC}] ${port}/tcp  ${LABEL}  ${RED}CLOSED/FILTERED${NC}"
         fi
     done
 
@@ -225,25 +219,46 @@ for TARGET in "${ADDR_LIST[@]}"; do
         echo -e "[--] Open ports    : ${RED}none${NC}  (0 of ${#PORTS[@]})"
     fi
 
+    # --- Smart Reachability Check ---
+    FINAL_STATUS="$PING_STATUS"
+    if [[ "$PING_STATUS" == "DOWN" && ${#OPEN_PORTS[@]} -gt 0 ]]; then
+        FINAL_STATUS="UP*"
+    fi
+
     # ── Store summary row ────────────────────────────────────────────────────
-    SUMMARY_LIST+=("${TARGET}|${RESOLVED_IP}|${REVERSE_NAME:-none}|${DNS_STATUS}|${PING_STATUS}|${OPEN_COUNT}/${#PORTS[@]}")
+    SUMMARY_LIST+=("${TARGET}|${RESOLVED_IP}|${REVERSE_NAME:-none}|${DNS_STATUS}|${FINAL_STATUS}|${OPEN_COUNT}/${#PORTS[@]}")
 
     echo -e "${CYAN}----------------------------------------------------${NC}"
 done
 
 # --- Final Summary Table ---
 echo -e "\n${WHITE}SCAN COMPLETE — SUMMARY${NC}"
-echo -e "${CYAN}====================================================${NC}"
-printf "${WHITE}%-22s %-16s %-20s %-6s %-6s %-10s${NC}\n" \
-    "TARGET" "RESOLVED IP" "REVERSE NAME" "DNS" "PING" "PORTS"
-echo -e "${CYAN}----------------------------------------------------${NC}"
+echo -e "${CYAN}==================================================================================================${NC}"
+printf "${WHITE}%-15s %-16s %-45s %-6s %-8s %-10s${NC}\n" \
+    "TARGET" "RESOLVED IP" "REVERSE NAME" "DNS" "STATUS" "PORTS"
+echo -e "${CYAN}--------------------------------------------------------------------------------------------------${NC}"
 for row in "${SUMMARY_LIST[@]}"; do
-    IFS='|' read -r t ip rev dns ping ports <<< "$row"
-    # Colour the status fields
-    [[ "$dns"  == "PASS" ]] && DNS_COL="${GREEN}PASS${NC}"  || DNS_COL="${RED}FAIL${NC}"
-    [[ "$ping" == "UP"   ]] && PING_COL="${GREEN}UP${NC}"   || PING_COL="${RED}DOWN${NC}"
-    printf "%-22s %-16s %-20s " "$t" "$ip" "$rev"
-    echo -e "${DNS_COL}  ${PING_COL}  ${WHITE}${ports}${NC}"
+    IFS='|' read -r t ip rev dns stat ports <<< "$row"
+    # Set colors
+    [[ "$dns"  == "PASS" ]] && DNS_COL="${GREEN}" || DNS_COL="${RED}"
+    if [[ "$stat" == "UP" ]]; then
+        STAT_COL="${GREEN}"
+    elif [[ "$stat" == "UP*" ]]; then
+        STAT_COL="${CYAN}"
+    else
+        STAT_COL="${RED}"
+    fi
+
+    # Print White text columns
+    printf "%-15s %-16s %-45s " "$t" "$ip" "$rev"
+    
+    # Print Color-managed columns
+    echo -ne "${DNS_COL}"; printf "%-6s " "$dns"; echo -ne "${NC}"
+    echo -ne "${STAT_COL}"; printf "%-8s " "$stat"; echo -ne "${NC}"
+    
+    # Print Ports (White)
+    echo -e "${WHITE}${ports}${NC}"
 done
-echo -e "${CYAN}====================================================${NC}"
-echo -e "${WHITE}Hosts scanned: ${#ADDR_LIST[@]}${NC}\n"
+echo -e "${CYAN}==================================================================================================${NC}"
+echo -e "${WHITE}Hosts scanned: ${#ADDR_LIST[@]}${NC}"
+echo -e "${CYAN}* Note: UP* indicates ICMP was blocked but TCP ports were found open.${NC}\n"
