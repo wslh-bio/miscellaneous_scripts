@@ -53,7 +53,12 @@ OUTPUT_FIELDS = [
 	"tract_fips",
 	"block_fips",
 	"fips12",
+	"error",
 ]
+
+# Census batch geocoder occasionally returns 502/503/504 under load, especially
+# for large batches. These are worth retrying with backoff.
+RETRYABLE_STATUS_CODES = {500, 502, 503, 504}
 
 
 def parse_args() -> argparse.Namespace:
@@ -107,17 +112,19 @@ def parse_args() -> argparse.Namespace:
 	parser.add_argument(
 		"--batch-size",
 		type=int,
-		default=1000,
+		default=500,
 		help=(
 			"Number of addresses to submit per API request, up to the API "
-			f"maximum of {MAX_BATCH_SIZE} (default: 1000)"
+			f"maximum of {MAX_BATCH_SIZE} (default: 500). The Census API tends "
+			"to return intermittent 502 errors on large batches, so smaller "
+			"values are more reliable."
 		),
 	)
 	parser.add_argument(
 		"--retries",
 		type=int,
-		default=3,
-		help="Number of times to retry a failed batch request (default: 3)",
+		default=5,
+		help="Number of times to retry a failed batch request (default: 5)",
 	)
 	parser.add_argument(
 		"--timeout",
@@ -161,15 +168,22 @@ def build_batch_payload(rows: list[dict], street_col: str, city_col: str,
 
 def submit_batch(payload: str, benchmark: str, vintage: str, retries: int,
                   timeout: int) -> str:
-	files = {"addressFile": ("addresses.csv", payload, "text/csv")}
 	data = {"benchmark": benchmark, "vintage": vintage}
 
 	last_error: Exception | None = None
 	for attempt in range(1, retries + 1):
 		try:
+			# Re-create the files dict each attempt: requests consumes the
+			# file-like/string body on send, so it can't be reused as-is.
+			files = {"addressFile": ("addresses.csv", payload, "text/csv")}
 			response = requests.post(
 				BATCH_URL, data=data, files=files, timeout=timeout
 			)
+			if response.status_code in RETRYABLE_STATUS_CODES:
+				raise requests.HTTPError(
+					f"{response.status_code} Server Error for url: {BATCH_URL}",
+					response=response,
+				)
 			response.raise_for_status()
 			return response.text
 		except requests.RequestException as exc:
@@ -178,7 +192,9 @@ def submit_batch(payload: str, benchmark: str, vintage: str, retries: int,
 				f"Batch request failed (attempt {attempt}/{retries}): {exc}\n"
 			)
 			if attempt < retries:
-				time.sleep(2 ** attempt)
+				wait = min(5 * (2 ** (attempt - 1)), 120)
+				sys.stderr.write(f"Retrying in {wait}s...\n")
+				time.sleep(wait)
 	raise RuntimeError(f"Batch request failed after {retries} attempts") from last_error
 
 
@@ -229,23 +245,36 @@ def parse_batch_response(response_text: str) -> dict[int, dict]:
 
 def geocode_rows(rows: list[dict], street_col: str, city_col: str, state_col: str,
                   zip_col: str, benchmark: str, vintage: str, batch_size: int,
-                  retries: int, timeout: int) -> dict[int, dict]:
+                  retries: int, timeout: int) -> tuple[dict[int, dict], list[tuple[int, int]]]:
 	batch_size = min(batch_size, MAX_BATCH_SIZE)
 	all_results: dict[int, dict] = {}
+	failed_ranges: list[tuple[int, int]] = []
 
 	for start in range(0, len(rows), batch_size):
 		batch_rows = rows[start:start + batch_size]
-		print(
-			f"Submitting records {start + 1}-{start + len(batch_rows)} "
-			f"of {len(rows)}..."
-		)
+		end = start + len(batch_rows)
+		print(f"Submitting records {start + 1}-{end} of {len(rows)}...")
 		payload = build_batch_payload(
 			batch_rows, street_col, city_col, state_col, zip_col, start_id=start
 		)
-		response_text = submit_batch(payload, benchmark, vintage, retries, timeout)
+		try:
+			response_text = submit_batch(payload, benchmark, vintage, retries, timeout)
+		except RuntimeError as exc:
+			sys.stderr.write(
+				f"Giving up on records {start + 1}-{end} after {retries} attempts: "
+				f"{exc}. Continuing with remaining batches.\n"
+			)
+			failed_ranges.append((start + 1, end))
+			for record_id in range(start, end):
+				result = {field: "" for field in OUTPUT_FIELDS}
+				result["match"] = "Error"
+				result["error"] = str(exc)
+				all_results[record_id] = result
+			continue
+
 		all_results.update(parse_batch_response(response_text))
 
-	return all_results
+	return all_results, failed_ranges
 
 
 def write_output(output_csv: Path, rows: list[dict], fieldnames: list[str],
@@ -273,7 +302,7 @@ def main() -> None:
 		sys.stderr.write(f"No data rows found in {input_csv}\n")
 		sys.exit(1)
 
-	results = geocode_rows(
+	results, failed_ranges = geocode_rows(
 		rows, args.street_column, args.city_column, args.state_column,
 		args.zip_column, args.benchmark, args.vintage, args.batch_size,
 		args.retries, args.timeout
@@ -282,6 +311,15 @@ def main() -> None:
 
 	matched = sum(1 for r in results.values() if r["match"] == "Match")
 	print(f"Done. {matched}/{len(rows)} addresses matched. Output written to {output_csv}")
+
+	if failed_ranges:
+		ranges_str = ", ".join(f"{lo}-{hi}" for lo, hi in failed_ranges)
+		sys.stderr.write(
+			f"\nWARNING: {len(failed_ranges)} batch(es) failed and were marked "
+			f"'Error' in the output: rows {ranges_str}. Re-run with just those "
+			"rows (or a smaller --batch-size) to retry them.\n"
+		)
+		sys.exit(1)
 
 
 if __name__ == "__main__":

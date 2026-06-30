@@ -46,8 +46,8 @@ With custom column names and a specific benchmark/vintage:
 | `--zip-column` | `zip` | Input column with the ZIP code |
 | `--benchmark` | `Public_AR_Current` | Which address-range snapshot to match addresses against |
 | `--vintage` | `Current_Current` | Which geography (block/tract/county boundaries) to report FIPS codes from |
-| `--batch-size` | `1000` | Addresses per API request (API max: 10,000) |
-| `--retries` | `3` | Retries per failed batch request |
+| `--batch-size` | `500` | Addresses per API request (API max: 10,000; smaller batches are more reliable) |
+| `--retries` | `5` | Retries per failed batch request, with exponential backoff |
 | `--timeout` | `600` | Per-request timeout in seconds |
 
 Run `./fips-lookup.py --help` for the full list.
@@ -70,9 +70,11 @@ The output contains all original input columns plus:
 | `tract_fips` | 6-digit census tract code for the matched location. Empty if not matched |
 | `block_fips` | 4-digit census block code for the matched location. Empty if not matched |
 | `fips12` | 12-digit census block group FIPS code (`state_fips` + `county_fips` + `tract_fips` + first digit of `block_fips`). Empty if not matched |
+| `error` | Populated with `match` set to `Error` only when the entire batch containing this row failed after all retries (e.g. repeated 502s). Empty otherwise |
 
 `fips12` (and the other geography columns) are empty when an address fails
-to match (`match` will be `No_Match` or `Tie`).
+to match (`match` will be `No_Match` or `Tie`), and also when `match` is
+`Error`.
 
 ## Understanding `--benchmark` vs `--vintage`
 
@@ -134,3 +136,24 @@ As a rule of thumb:
 - Pick the `vintage` based on which census/ACS year's geography boundaries
   you need the FIPS code to align with (`Census2010_Current`,
   `Census2020_Current`, `ACS2023_Current`, etc.).
+
+## Troubleshooting: `502 Server Error` / failed batches
+
+The Census batch geocoder is a shared public service and occasionally returns
+`502`/`503`/`504` errors under load, especially for larger batches. The
+script automatically retries each batch (`--retries`, default 5) with
+exponential backoff before giving up.
+
+If a batch still fails after all retries, the script **does not abort the
+whole run**: it marks every row in that batch with `match=Error` (and a
+message in the `error` column), prints a warning listing the affected row
+ranges, and continues processing the remaining batches so you don't lose
+work that already succeeded. To recover the failed rows, either:
+
+- Re-run the script against just those rows (e.g. extract them to a separate
+  CSV using the row ranges printed in the warning), or
+- Re-run the whole input with a smaller `--batch-size` (e.g. `200`), which
+  reduces the chance of timeouts/502s on any single request.
+
+The script exits with a non-zero status code when any batch ultimately
+fails, so it's safe to check for this in automated/scripted runs.
