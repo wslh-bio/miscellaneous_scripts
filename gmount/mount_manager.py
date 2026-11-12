@@ -11,6 +11,7 @@ from gvfs_backend import GVFSBackend
 from rclone_backend import RcloneBackend
 from utils import log, warning, error
 from cifs_backend import CIFSBackend
+from debug import DebugPrinter
 
 # Backend type constants
 BACKEND_GVFS = "gvfs"
@@ -145,3 +146,10 @@ class MountManager:
                                     failure_count += 1
 
         return success_count, failure_count
+
+
+    def debug_mounts(self, user_vars: Dict[str, str]) -> int:
+        """Print manual mount commands without executing them."""
+        printer = DebugPrinter(self.backends, user_vars)
+        return printer.print_mounts(self.config)
+
