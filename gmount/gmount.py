@@ -11,6 +11,7 @@ from mount_manager import MountManager
 from utils import break_handler, get_user_ids, error, log, warning, COLORS
 
 
+
 class PassManager:
     """Manages authentication credentials for mount operations."""
 
@@ -50,6 +51,8 @@ def main():
                         help='Path to JSON configuration file')
     parser.add_argument('-u', '--umount', action='store_true',
                         help='Unmount instead of mount')
+    parser.add_argument('-d', '--debug', action='store_true',
+                        help='Print mount commands instead of executing them')
     args = parser.parse_args()
 
     # Get environment variables for path expansion
@@ -61,16 +64,21 @@ def main():
     # Create a PassManager instance
     pass_manager = PassManager()
 
-    # Get password if needed (only when mounting)
-    if not args.umount:
+    # Get password only when actually mounting (not unmounting or debugging)
+    if not args.umount and not args.debug:
         password = pass_manager.get_pass()
         if not password:
-            return 1  # Error already logged in get_pass
+            return 1
 
     # Create and configure the MountManager
     try:
         manager = MountManager(args.config, pass_manager)
         manager.load_config(user_vars=user_vars)
+
+        if args.debug:
+            count = manager.debug_mounts(user_vars)
+            return 0 if count > 0 else 1
+
         success_count, failure_count = manager.process_mounts(user_vars, args.umount)
 
         # Report results
@@ -81,6 +89,6 @@ def main():
         error(f"Configuration error: {e}", exit_code=None)
         return 1
 
-
 if __name__ == '__main__':
     sys.exit(main())
+

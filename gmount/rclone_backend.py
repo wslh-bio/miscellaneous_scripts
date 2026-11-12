@@ -128,38 +128,18 @@ class RcloneBackend:
         rclone_config = config['config']
         remote_path = config.get('remote', '')
         log(f"Mounting S3 bucket ({remote_path} -> {local_path})")
-        # Construct the rclone mount command
-        #   rclone mount --config="/home/bladertm/.config/rclone/rclone.conf"  acloud: ~/mnt/my-bucket-9376 --vfs-cache-mode full
-        #   bucket="my-bucket-9376"; test ! -d $HOME/mnt/${bucket} && mkdir $HOME/mnt/${bucket}; rclone mount --config="$HOME/.config/rclone/rclone.conf"  acloud: $HO --vfs-cache-mode full
-        # rclone mount acloud:/ /home/bladertm/mnt/my-bucket-9376   --vfs-cache-mode full
-        #
-        # rclone mount acloud:/my-bucket-9376 /home/bladertm/mnt/my-bucket-9376   --vfs-cache-mode full
-        # sample rclone.conf entry for below:
-        #
-        # [acloud]  # < bucket my-bucket-9366 is defined in this account
-        # type = s3
-        # provider = AWS
-        # env_auth = true
-        # region = us-east-1
-        # acl = private
-        # server_side_encryption = AES256
-        # 
-        cmd = [
-            'rclone', 'mount',
-            '--config', rclone_config,
-            remote_path,
-            local_path.as_posix(),
-            '--vfs-cache-mode',
-            'full',
-            '--daemon'
-        ]
+
+        cmd = self.build_mount_command(config)
+
         try:
             subprocess.run(cmd, check=True)
             time.sleep(5)
             if self.is_mount_ready(local_path):
                 log_ok(f"Successfully mounted {remote_path} to {local_path}")
+                return True
             else:                
                 notice (f"rclone command for {remote_path} was successful but {local_path} may not yet be active.")            
+                return True
         except subprocess.CalledProcessError as e:
             warning(f"Failed to mount {remote_path} to {local_path}: {e}")
             return False
@@ -214,3 +194,18 @@ class RcloneBackend:
 
         warning(f"Mount point {mount_point} exists but is not responsive")
         return False
+
+    def build_mount_command(self, config: Dict[str, str]) -> list:
+        """Build the rclone mount command list."""
+        local_path = Path(config['local'])
+        rclone_config = config['config']
+        remote_path = config.get('remote', '')
+
+        return [
+            'rclone', 'mount',
+            '--config', rclone_config,
+            remote_path,
+            local_path.as_posix(),
+            '--vfs-cache-mode', 'full',
+            '--daemon'
+        ]

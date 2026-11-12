@@ -324,6 +324,19 @@ or
 ./gmount.py --config /path/to/custom_config.json
 ```
 
+### Debugging connections
+If you are having trouble mounting filesystems, it may be helpful to paste the incantations in one-at-a-time to debug the problem.  Gmount will give you a list of commands to try based on your defaults or config file, if included.
+
+```bash
+$ ./gmount.py -d -c ~/.config/gmount/gmount.json
+=== Debug Mode: Manual Mount Commands ===
+
+# [CIFS] fileserver.ad.mydomain.com
+mkdir -p /home/jtidwell/mnt/data
+/bin/sudo mount -t cifs //localhost/home/jtidwell /home/jtidwell/mnt/home -o port=24451,domain=MYDOMAIN,username=jtidwell,rw,uid=33201,gid=2201,file_mode=0644,dir_mode=0755,vers=3.0
+
+```
+
 ## How It Works
 
 1. The script loads the configuration from the specified JSON file

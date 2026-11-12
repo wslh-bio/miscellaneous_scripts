@@ -165,15 +165,18 @@ class CIFSBackend:
                 mount_options = f"port={port},{mount_options}" if mount_options else f"port={port}"
 
             # Build mount command
-            cmd = [
-                '/bin/sudo', 'mount', '-t', 'cifs',
-                unc_path,  # Use the properly formatted UNC path
-                local_path.as_posix(),
-            ]
+            #cmd = [
+            #    '/bin/sudo', 'mount', '-t', 'cifs',
+            #    unc_path,  # Use the properly formatted UNC path
+            #    local_path.as_posix(),
+            #]
 
-            # Add options if any
-            if mount_options:
-                cmd.extend(['-o', mount_options])
+            cmd = self.build_mount_command(
+                config,
+                cred_file=temp_file.name,
+                user_vars=user_vars,
+                debug=False
+            )
 
             log(f"Executing mount command: {' '.join(cmd)}")
 
@@ -297,3 +300,50 @@ class CIFSBackend:
 
         warning(f"Mount point {mount_point} exists but is not responsive")
         return False
+
+
+    def build_mount_command( self, config: Dict[str, str], cred_file: Optional[str] = None,
+        user_vars: Dict[str, str] = {}, debug: bool = False) -> list:
+
+        """Build the sudo mount -t cifs command list."""
+        local_path = Path(config['local'])
+        host = config['host']
+        share = config['share'].lstrip('/')
+
+        server = host
+        port = None
+        if ':' in host:
+            server, port = host.split(':', 1)
+
+        unc_path = f"//{server}/{share}"
+        options_list = []
+
+        if port:
+            options_list.append(f"port={port}")
+
+        if cred_file and not debug:
+            options_list.append(f"credentials={cred_file}")
+        elif debug:
+            # Ensure username is set for interactive password prompt if not already in options
+            existing_opts = config.get('options', '')
+            if 'username=' not in existing_opts and user_vars.get('user'):
+                options_list.append(f"username={user_vars['user']}")
+
+        if config.get('domain'):
+            options_list.append(f"domain={config['domain']}")
+
+        if config.get('options'):
+            options_list.append(config['options'])
+
+        mount_options = ",".join(options_list)
+
+        cmd = [
+            '/bin/sudo', 'mount', '-t', 'cifs',
+            unc_path,
+            local_path.as_posix(),
+        ]
+
+        if mount_options:
+            cmd.extend(['-o', mount_options])
+
+        return cmd

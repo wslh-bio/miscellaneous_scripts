@@ -156,12 +156,13 @@ class GVFSBackend:
 
         # Format URL for gio mount command
         gvfs_url = f"smb://{hostname}/{share}"
+        mount_cmd = self.build_mount_command(config)
 
         log(f"Mounting {gvfs_url} ({config['comment']})")
 
         # Use pexpect to handle interactive prompts
         try:
-            child = pexpect.spawn(f'gio mount "{gvfs_url}"')
+            child = pexpect.spawn(mount_cmd)
 
             # Define possible prompts
             prompts = ['Authentication Required', 'User', 'Domain', 'Password:', pexpect.EOF, pexpect.TIMEOUT]
@@ -276,3 +277,10 @@ class GVFSBackend:
 
         warning(f"Mount point {mount_point} exists but is not responsive")
         return False
+
+    def build_mount_command(self, config: Dict[str, str]) -> str:
+        """Build the gio mount command string."""
+        hostname = config['host']
+        share = config['share'].strip('/')
+        gvfs_url = f"smb://{hostname}/{share}"
+        return f'gio mount "{gvfs_url}"'
